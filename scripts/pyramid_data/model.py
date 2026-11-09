@@ -23,9 +23,15 @@ INTERCENSAL_YEARS = (
 )
 
 
+# 1951〜1954年の第4表は上位区分が「80歳以上」（1952年のみ「79歳以上」）
+OPEN_AGE_1951_1954 = {1951: 80, 1952: 79, 1953: 80, 1954: 80}
+
+
 def open_age(year: int) -> int:
     if year in (1945, 1946):
         return 86
+    if year in OPEN_AGE_1951_1954:
+        return OPEN_AGE_1951_1954[year]
     if year < 1980:
         return 85
     if year < 2000:

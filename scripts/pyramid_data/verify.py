@@ -282,7 +282,7 @@ def check_xmax(rep, doc):
 
 def check_notes(rep, doc):
     rep.ran("notes-vs-openage")
-    want = {85: "open-85", 86: "open-86", 90: "open-90", 100: "open-100"}
+    want = {79: "open-79", 80: "open-80", 85: "open-85", 86: "open-86", 90: "open-90", 100: "open-100"}
     bad = []
     for y in doc["years"]:
         have = [n for n in y["noteIds"] if n.startswith("open-")]
