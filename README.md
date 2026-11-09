@@ -12,7 +12,7 @@ python3 -m http.server 8000
 
 `?year=1950` のように URL で年を指定できます。`?fixture=1` を付けると、サンプルデータ（`tests/fixtures/pyramid.fixture.json`）で表示します。
 
-GitHub Pages で公開する場合は、Settings → Pages → Branch: `main` / root を選びます。
+GitHub Pages で公開する場合は、`main` にマージ後、Settings → Pages → Source: Deploy from a branch → Branch: `main` / (root) を選びます。
 
 ## データの出典と注意点
 
@@ -70,8 +70,17 @@ docs/PLAN.md          実装の契約（データ形式・表示仕様）
 docs/screenshots/     動作確認のスクリーンショット
 ```
 
+## アクセシビリティ
+
+棒の淡い色（手本の配色）は背景とのコントラストが3:1に届きません。同じ値はデータ表とツールチップでも読めます。
+
 ## 利用条件
 
 出典：総務省統計局「人口推計」「令和7年国勢調査」（e-Stat）を加工して作成
 
-データの利用は [政府標準利用規約（第2.0版）](https://www.digital.go.jp/resources/open_data/public_data_license_v2.0) に従います。加工したデータであり、総務省統計局が作成・保証したものではありません。
+データの利用条件は取得元ごとに異なります。
+
+- e-Stat から取得した表（lt1920、lt2000、census2025）：[e-Stat の利用規約](https://www.e-stat.go.jp/terms-of-use)（政府標準利用規約（第2.0版）に準拠）
+- 統計局サイトから取得した表（2021〜2024年の人口推計）：[公共データ利用規約（第1.0版）](https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)
+
+加工したデータであり、総務省統計局が作成・保証したものではありません。

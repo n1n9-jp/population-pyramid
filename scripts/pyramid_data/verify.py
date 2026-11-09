@@ -102,15 +102,15 @@ def check_sums(rep, tables):
             continue
         n_m, n_f = len(_nn(t.male)), len(_nn(t.female))
         for label, got, total, n in (
-            ("male", sum(_nn(t.male)) + t.unknown_male, t.total_male, n_m),
-            ("female", sum(_nn(t.female)) + t.unknown_female, t.total_female, n_f),
-            ("both", sum(_nn(t.male)) + sum(_nn(t.female)) + t.unknown_male + t.unknown_female, t.total_both, n_m + n_f),
+            ("男", sum(_nn(t.male)) + t.unknown_male, t.total_male, n_m),
+            ("女", sum(_nn(t.female)) + t.unknown_female, t.total_female, n_f),
+            ("男女計", sum(_nn(t.male)) + sum(_nn(t.female)) + t.unknown_male + t.unknown_female, t.total_both, n_m + n_f),
         ):
             d = abs(got - total)
             if d > 500 * (n + 1):
-                rep.add("FAIL", "sums", f"{label}: 各歳合計と総数の差 {d:,}人 > {500 * (n + 1):,}人", t.year)
+                rep.add("FAIL", "sums", f"{label}の各歳合計と総数の差（丸め誤差） {d:,}人 > {500 * (n + 1):,}人", t.year)
             elif d > SUM_WARN:
-                rep.add("WARN", "sums", f"{label}: 各歳合計と総数の差 {d:,}人 > {SUM_WARN:,}人", t.year)
+                rep.add("WARN", "sums", f"{label}の各歳合計と総数の差（丸め誤差） {d:,}人 > {SUM_WARN:,}人", t.year)
             worst.append(d)
     rep.ran("sums-exact")
     for t in tables:
