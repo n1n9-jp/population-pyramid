@@ -158,7 +158,7 @@ Git の手順は docs/PLAN.md §5 と同じ（ブランチ `claude/sharp-newton-
 - 切り替え：`#facet-toggle button[data-facet="prefecture"]` と `[data-facet="block"]`。選択中は `aria-pressed="true"`。
 - タイル：`.tile[data-area]`（data-area は "01"〜"47" かブロック id）。表示中の facet のタイルだけが DOM にあり、hidden ではない。
   - 中身：`rect.bar[data-sex][data-group]`（data-group は 0〜17）と `[data-value]`（割合。小数、null は ""）。
-  - 最終の width は `value / xMaxShare * halfWidth`。halfWidth はタイルの `data-half-width` 属性に入れる。
+  - 最終の width は `value / xMaxShare * halfWidth`。halfWidth はタイルの `data-half-width` 属性に入れる。単位は SVG の viewBox 単位で、棒の `width` 属性と同じ（画面上の px ではない）。E2E は `getAttribute('width')` と比べる。
   - 参照線：`path.national[data-sex]`。データなし：`.tile-missing`。
 - 操作：`#year-display`（「1950年」）、`#year-slider`、`#btn-play[aria-label=再生|一時停止]`、`#btn-rewind[aria-label=最初に戻る]`、`#tooltip`（hidden で開閉）、`.badge[data-note]`、`#notes-list li[data-note]`。
 - 状態：描画完了後に `document.body.dataset.ready="true"`。年が変わるたびに `body.dataset.year="1950"`、facet が変わるたびに `body.dataset.facet="prefecture"|"block"` を更新する。

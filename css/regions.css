@@ -77,3 +77,5 @@
 
 /* データなしのタイルは棒も参照線も描かない */
 .tile.is-missing .tile-svg { visibility: hidden; }
+/* 下部固定の操作部（.controls-sticky、約103px）にタイルが隠れないようにする */
+html { scroll-padding-bottom: 110px; }
