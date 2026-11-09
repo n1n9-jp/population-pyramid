@@ -94,7 +94,7 @@ const readTileBars = (page, area) =>
     return {
       hw: parseFloat(tile.dataset.halfWidth),
       bars: [...tile.querySelectorAll('rect.bar')].map((r) => ({
-        sex: r.dataset.sex, group: +r.dataset.group, value: r.dataset.value, w: r.getBoundingClientRect().width,
+        sex: r.dataset.sex, group: +r.dataset.group, value: r.dataset.value, w: parseFloat(r.getAttribute('width')), // viewBox のユーザー単位（data-half-width と同じ単位）
       })),
     };
   }, area);
@@ -130,7 +130,8 @@ const waitTooltip = (page) =>
 
 async function tileCenter(page, area) {
   const loc = page.locator(`.tile[data-area="${area}"]`);
-  await loc.scrollIntoViewIfNeeded();
+  // 下部固定の操作バー（.controls-sticky）に隠れないよう、画面の中央へ寄せる
+  await loc.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   const bb = await loc.boundingBox();
   assert(bb, `タイル ${area} の位置を取得できません`);
   return { x: bb.x + bb.width / 2, y: bb.y + bb.height * 0.6 };
@@ -201,9 +202,10 @@ async function main() {
     });
     await check('4. 1980年 ブロック kanto の棒の幅と data-value', async () => {
       await setFacet(dp, 'block');
-      await sleep(150);
-      verifyTile(await readTileBars(dp, 'kanto'), shares(data, 'kanto', 1980), xMax, '関東1980');
-      await setFacet(dp, 'prefecture');
+      try {
+        await sleep(150);
+        verifyTile(await readTileBars(dp, 'kanto'), shares(data, 'kanto', 1980), xMax, '関東1980');
+      } finally { await setFacet(dp, 'prefecture'); }
     });
 
     // ---- 5. 再生（モーション有効）----
