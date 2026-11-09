@@ -1,0 +1,94 @@
+{
+ "result": "PASS",
+ "counts": {
+  "FAIL": 0,
+  "WARN": 10
+ },
+ "checks": [
+  "years",
+  "meta",
+  "nulls",
+  "schema",
+  "sums",
+  "sums-exact",
+  "both-sexes",
+  "cross-2000",
+  "sex-ratio",
+  "hinoeuma",
+  "cohort",
+  "published-totals",
+  "xmax",
+  "notes-vs-openage"
+ ],
+ "stats": {
+  "xMaxPerSex": 1500000,
+  "maxValue": {
+   "value": 1316000,
+   "year": 1949,
+   "age": 0,
+   "sex": "male"
+  }
+ },
+ "findings": [
+  {
+   "level": "WARN",
+   "check": "cohort",
+   "message": "1936→1937 male: コホート比が範囲外の年齢 1個（最大 20→21歳 比=0.786）",
+   "year": 1936
+  },
+  {
+   "level": "WARN",
+   "check": "cohort",
+   "message": "1937→1938 male: コホート比が範囲外の年齢 2個（最大 20→21歳 比=0.674）",
+   "year": 1937
+  },
+  {
+   "level": "WARN",
+   "check": "cohort",
+   "message": "1938→1939 male: コホート比が範囲外の年齢 3個（最大 20→21歳 比=0.676）",
+   "year": 1938
+  },
+  {
+   "level": "WARN",
+   "check": "cohort",
+   "message": "1939→1940 male: コホート比が範囲外の年齢 2個（最大 20→21歳 比=0.644）",
+   "year": 1939
+  },
+  {
+   "level": "WARN",
+   "check": "sex-ratio",
+   "message": "0歳の性比 1.014 が 1.02〜1.09 の外",
+   "year": 1920
+  },
+  {
+   "level": "WARN",
+   "check": "sex-ratio",
+   "message": "0歳の性比 1.018 が 1.02〜1.09 の外",
+   "year": 1922
+  },
+  {
+   "level": "WARN",
+   "check": "sex-ratio",
+   "message": "0歳の性比 1.018 が 1.02〜1.09 の外",
+   "year": 1923
+  },
+  {
+   "level": "WARN",
+   "check": "sex-ratio",
+   "message": "0歳の性比 1.012 が 1.02〜1.09 の外",
+   "year": 1925
+  },
+  {
+   "level": "WARN",
+   "check": "sex-ratio",
+   "message": "1歳の性比 1.019 が 1.02〜1.09 の外",
+   "year": 1946
+  },
+  {
+   "level": "WARN",
+   "check": "sums",
+   "message": "both: 各歳合計と総数の差 11,000人 > 10,000人",
+   "year": 2010
+  }
+ ]
+}
