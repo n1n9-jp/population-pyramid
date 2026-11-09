@@ -1,5 +1,5 @@
 export const COLORS = {
-  bg: "#f4eedf",
+  bg: "#ffffff",
   male: "#9db9d9",
   female: "#ffc56e",
   maleStrong: "#567eae",
