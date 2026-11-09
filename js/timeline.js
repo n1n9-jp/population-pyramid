@@ -60,14 +60,25 @@ export function createTimeline({ root, svgEl, slider, data, store }) {
   slider.min = yearMin;
   slider.max = yearMax;
   slider.step = 1;
+  let lastRaw = store.getState().year; // 直前のスライダー生値（gap解決前）
+  let inInput = false;
+  // キー操作は現在値（解決後）からの±1なので、基準も現在値に合わせる
+  slider.addEventListener("keydown", () => { lastRaw = store.getState().year; });
   slider.addEventListener("input", () => {
     store.pause();
     const v = Number(slider.value);
-    const prev = store.getState().year;
-    store.setYear(v, { direction: v > prev ? 1 : -1 });
+    const direction = v >= lastRaw ? 1 : -1;
+    lastRaw = v;
+    inInput = true;
+    store.setYear(v, { direction });
+    inInput = false;
     sync();
   });
-  store.subscribe((_s, change) => { if (change.type === "year") sync(); });
+  store.subscribe((s, change) => {
+    if (change.type !== "year") return;
+    if (!inInput) lastRaw = s.year; // 再生・URL・ボタンなど外部からの変更に追従
+    sync();
+  });
 
   draw();
   new ResizeObserver(() => { if (root.clientWidth !== width) draw(); }).observe(root);

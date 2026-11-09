@@ -7,6 +7,20 @@
   <meta name="description" content="1920年から2025年までの日本の人口ピラミッド（各歳・男女別）をアニメーションで見られます。">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+  <script>
+    // module スクリプトは file:// で読めないため、通常のスクリプトで案内を出す
+    if (location.protocol === "file:") {
+      document.addEventListener("DOMContentLoaded", function () {
+        var wrap = document.getElementById("chart-wrap");
+        if (!wrap) return;
+        var p = document.createElement("p");
+        p.id = "chart-error";
+        p.setAttribute("role", "alert");
+        p.textContent = "このページはローカルファイルとしては開けません。リポジトリ直下で `python3 -m http.server 8000` を実行し、http://localhost:8000/ を開いてください。";
+        wrap.replaceChildren(p);
+      });
+    }
+  </script>
   <script type="module" src="js/main.js"></script>
 </head>
 <body>

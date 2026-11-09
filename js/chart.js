@@ -306,8 +306,9 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
 
   const hover = { onRow: null };
   hits.forEach((h, a) => {
-    h.addEventListener("pointerenter", (e) => hover.onRow?.(a, e));
-    h.addEventListener("pointermove", (e) => hover.onRow?.(a, e));
+    // タッチでは pointerdown だけで開閉する（enter/move で開くと直後の down で閉じてしまう）
+    h.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch") hover.onRow?.(a, e); });
+    h.addEventListener("pointermove", (e) => { if (e.pointerType !== "touch") hover.onRow?.(a, e); });
     h.addEventListener("pointerdown", (e) => hover.onRow?.(a, e));
     h.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") hover.onRow?.(null, e); });
   });
