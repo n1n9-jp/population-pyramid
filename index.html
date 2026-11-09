@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>日本の人口ピラミッド 1920–2025</title>
+  <meta name="description" content="1920年から2025年までの日本の人口ピラミッド（各歳・男女別）をアニメーションで見られます。">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div id="fixture-banner" class="fixture-banner" hidden>サンプルデータ（実際の統計ではありません）</div>
+  <div class="page">
+    <header class="site-header">
+      <h1>日本の人口ピラミッド <span class="range">1920–2025</span></h1>
+      <p class="lede">各歳・男女別の人口が、100年あまりでどう変わったかを見られます。再生ボタンを押すか、下のスライダーで年を選んでください。</p>
+    </header>
+
+    <main>
+      <section id="viewer" aria-label="人口ピラミッド">
+        <div class="readout">
+          <div class="year-row">
+            <div id="year-display" aria-live="polite"></div>
+            <div id="wareki-display"></div>
+            <div id="badges" class="badges"></div>
+          </div>
+          <div id="year-meta" class="year-meta"></div>
+          <div id="total-display" class="total"></div>
+        </div>
+
+        <div id="chart-wrap" class="chart-wrap">
+          <svg id="chart" class="chart" aria-label="人口ピラミッド"></svg>
+          <div id="callout-layer" class="callout-layer"></div>
+          <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+        </div>
+
+        <div class="controls">
+          <div class="buttons">
+            <button type="button" id="btn-rewind" class="btn" aria-label="最初に戻る">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>
+            </button>
+            <button type="button" id="btn-play" class="btn btn-primary" aria-label="再生"></button>
+          </div>
+          <div id="timeline" class="timeline">
+            <svg id="timeline-svg" aria-hidden="true"></svg>
+            <input type="range" id="year-slider" min="1920" max="2025" step="1" value="1920" aria-label="年">
+          </div>
+        </div>
+
+        <div class="notes">
+          <h2>この年についての注記</h2>
+          <ul id="notes-list"></ul>
+        </div>
+      </section>
+
+      <details id="data-details" class="data-details">
+        <summary>この年のデータを表で見る</summary>
+        <p class="csv-links">
+          全期間のデータ：
+          <a href="data/population_by_age.csv" download>年齢別人口（CSV）</a>・
+          <a href="data/population_totals.csv" download>総人口（CSV）</a>
+        </p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="年齢別人口の表">
+          <table id="data-table">
+            <caption id="data-table-caption"></caption>
+            <thead><tr><th scope="col">年齢</th><th scope="col">男性</th><th scope="col">女性</th><th scope="col">計</th></tr></thead>
+          </table>
+        </div>
+      </details>
+
+      <section id="about" class="about">
+        <h2>図の読み方</h2>
+        <p></p>
+      </section>
+    </main>
+
+    <footer id="sources" class="sources">
+      <h2>出典</h2>
+      <p id="attribution"></p>
+      <ul id="source-list"></ul>
+    </footer>
+  </div>
+</body>
+</html>
