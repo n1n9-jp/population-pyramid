@@ -5,6 +5,18 @@
     "sha256": "5903643154799167cc94bf8301e342b2ba8a7a509cfe619f4e472e6dd78f86e4",
     "url": "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000040506653&fileKind=0"
   },
+  "census_ts2": {
+    "file": "census_ts2.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "f8ff203987eb48be21ec952b310f7119324dbac1329fa57e4fc6458404c00191",
+    "url": "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000001085926&fileKind=0"
+  },
+  "census_ts3": {
+    "file": "census_ts3.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "70ed1d6589a1c7c41b502ad4c1227a2a1d6d0d28c45da52bcb5312cc1e5510eb",
+    "url": "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000001085927&fileKind=0"
+  },
   "est2021": {
     "file": "est2021.xlsx",
     "retrieved": "2026-11-09",
