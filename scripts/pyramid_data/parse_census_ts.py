@@ -25,6 +25,10 @@ TS2_SHEET = "da02"
 CENSUS2025_SHEET = "wb02_01"
 
 # census_ts3 の行ラベル（NFKC・空白除去後）→ 段の添字。「80～84歳（80歳以上）」も 16。
+# 表の誤記として既知の箇所（(都道府県, 年, 段) → 誤っている列）。総数 − 他方の列で直す。
+# 広島県1925年「80～84歳（80歳以上）」: 総数 7,648 に対し 男 3,064 + 女 4,534 = 7,598。全国表は女＝総数−男（4,584）で合う。
+KNOWN_ROW_FIXES = {("34", 1925, 16): ("female", 50)}  # 列, 総数との差（人）
+
 _GROUP_RE = re.compile(r"(\d+)[~～〜](\d+)歳(?:\((\d+)歳以上\))?")
 
 
@@ -83,7 +87,8 @@ def ts3_year_columns(header):
 def parse_ts3(path):
     """({pref_code: {"name": str, "years": {year: raw}}}, anomalies) を返す。
 
-    anomalies は、段の行で 総数 ≠ 男 + 女 だった箇所（男・女の列を正とする）。
+    anomalies は、段の行で 総数 ≠ 男 + 女 だった箇所。KNOWN_ROW_FIXES にある箇所は、誤記の列を
+    総数 − 他方の列で直し（"fixed": 直した列, "from"/"to": 直す前後の値）、それ以外は男・女の列をそのまま使う。
 
     raw = {"male": [18], "female": [18], "total": int|None, "totalMale": int|None,
            "totalFemale": int|None, "labels": [18 個の行ラベル]}
@@ -127,9 +132,14 @@ def parse_ts3(path):
                 raw["male"][idx], raw["female"][idx] = male, female
                 raw["labels"][idx] = norm(_cell(r, 1))
                 if both is not None and male is not None and female is not None and both != male + female:
-                    # 表の「総数」列の誤り。男・女の列を使い、レポートに残す
-                    anomalies.append({"area": code, "year": y, "group": idx, "label": norm(_cell(r, 1)),
-                                      "both": both, "male": male, "female": female})
+                    rec = {"area": code, "year": y, "group": idx, "label": norm(_cell(r, 1)),
+                           "both": both, "male": male, "female": female}
+                    fix = KNOWN_ROW_FIXES.get((code, y, idx))
+                    if fix and both - male - female == fix[1] * (1 if fix[0] == "female" else -1):
+                        # 既知の誤記。女の列を 総数 − 男 に直す
+                        raw["female"][idx] = both - male
+                        rec.update({"fixed": "female", "from": female, "to": both - male})
+                    anomalies.append(rec)
     for code, a in out.items():
         if a.pop("_seen") != set(range(N)) | {"total"}:
             raise ParseError(f"census_ts3: {code} の年齢区分の行がそろっていません")

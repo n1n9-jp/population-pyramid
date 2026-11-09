@@ -321,7 +321,12 @@ def main(argv=None) -> int:
         doc, shapes = build_document(ts3, c2025, lock)
         with open(os.path.join(data, "schema", "regions.schema.json"), encoding="utf-8") as f:
             schema = json.load(f)
-        report = regions_verify.verify(doc, ts3, shapes, anomalies, kazoe, ts2, schema, c2025)
+        pyramid = None
+        pyramid_path = os.path.join(data, "pyramid.json")
+        if os.path.exists(pyramid_path):
+            with open(pyramid_path, encoding="utf-8") as f:
+                pyramid = json.load(f)
+        report = regions_verify.verify(doc, ts3, shapes, anomalies, kazoe, ts2, schema, c2025, pyramid)
     except (common.ParseError, ValueError, KeyError) as e:
         msg = f"{type(e).__name__}: {e}"
         print(f"構築失敗: {msg}", file=sys.stderr)

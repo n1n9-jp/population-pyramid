@@ -1937,7 +1937,7 @@ year,area_id,area_name,age_group,is_open,sex,population
 1925,national,全国,65-69,false,female,692865
 1925,national,全国,70-74,false,female,515625
 1925,national,全国,75-79,false,female,309382
-1925,national,全国,80-84,false,female,136688
+1925,national,全国,80-84,false,female,136738
 1925,national,全国,85+,true,female,47149
 1925,01,北海道,0-4,false,male,204576
 1925,01,北海道,5-9,false,male,170315
@@ -3161,7 +3161,7 @@ year,area_id,area_name,age_group,is_open,sex,population
 1925,34,広島県,65-69,false,female,21982
 1925,34,広島県,70-74,false,female,16332
 1925,34,広島県,75-79,false,female,10239
-1925,34,広島県,80-84,false,female,4534
+1925,34,広島県,80-84,false,female,4584
 1925,34,広島県,85+,true,female,1808
 1925,35,山口県,0-4,false,male,71155
 1925,35,山口県,5-9,false,male,61895
@@ -3845,7 +3845,7 @@ year,area_id,area_name,age_group,is_open,sex,population
 1925,chugoku,中国,65-69,false,female,77349
 1925,chugoku,中国,70-74,false,female,56394
 1925,chugoku,中国,75-79,false,female,35022
-1925,chugoku,中国,80-84,false,female,16240
+1925,chugoku,中国,80-84,false,female,16290
 1925,chugoku,中国,85+,true,female,5868
 1925,shikoku,四国,0-4,false,male,219696
 1925,shikoku,四国,5-9,false,male,192202

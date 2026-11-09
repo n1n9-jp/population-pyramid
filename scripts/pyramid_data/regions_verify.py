@@ -110,11 +110,6 @@ def ceil_step(x, denom_steps=200):
 
 # 差 = 47都道府県の合計 − census_ts2（全国）。段は全国 series の openIndex にそろえた添字
 KNOWN_TS2_DIFFS = {
-    1925: {
-        "diff": {"male": {"groups": {}, "total": 0}, "female": {"groups": {16: -50}, "total": 0}},
-        "reason": "第3表の広島県1925年「80～84歳」の女が 4,534 人で、同じ行の総数 7,648 − 男 3,064 = 4,584 人より 50 人少ない。"
-                  "第3表の女の値の誤記とみられる。総数（女）は全国表と一致するので、この 50 人は広島県の女の年齢不詳として扱われる。",
-    },
     1950: {
         "diff": {
             "male": {"groups": {0: -400, 1: -513, 2: -516, 3: -508, 4: -437, 5: -357, 6: -265, 7: -298, 8: -258,
@@ -122,9 +117,12 @@ KNOWN_TS2_DIFFS = {
             "female": {"groups": {0: -389, 1: -449, 2: -569, 3: -479, 4: -376, 5: -308, 6: -299, 7: -250, 8: -191,
                                   9: -155, 10: -86, 11: -80, 12: -60, 13: -54}, "total": -3826},
         },
-        "reason": "全国表は1950年の沖縄県の外国人を含むとみられる（第2表脚注5：70歳以上の各段から沖縄県の70歳以上の外国人136人"
-                  "〈男55人、女81人〉を除く）。都道府県の合計は全国表より男 4,257 人・女 3,826 人少なく、"
-                  "差のうち男55・女81は各段ではなく不詳の差で、70歳以上の外国人が全国表では総数にだけ入っているとみられる。70歳以上（全国は70歳以上で一括）は一致する。",
+        "reason": "全国表は、沖縄県の都道府県別表に含まれない人口を含むとみられる"
+                  "（第2表脚注5：70歳以上の各段から沖縄県の70歳以上の外国人136人〈男55人、女81人〉を除く、とある）。"
+                  "都道府県の合計は全国表より男 4,257 人・女 3,826 人少なく、"
+                  "差のうち男55・女81は各段ではなく不詳の差で、沖縄県の都道府県別表に含まれない70歳以上の人口"
+                  "（第2表脚注の70歳以上の外国人136人を含む）が全国表では総数にだけ入っているとみられる。"
+                  "70歳以上（全国は70歳以上で一括）は一致する。",
     },
     1955: {
         "diff": {"male": {"groups": {14: 8090}, "total": 0}, "female": {"groups": {14: 15238}, "total": 0}},
@@ -133,8 +131,13 @@ KNOWN_TS2_DIFFS = {
     },
 }
 
-KNOWN_ROW_ANOMALIES = {("34", 1925, 16): ("広島県1925年「80～84歳（80歳以上）」の行で、総数列 7,648 が 男 3,064 + 女 4,534 = 7,598 と 50 人合わない。"
-                                         "男・女の列を使う（全国表との照合でも女が 50 人少ない差として現れる）。")}
+KNOWN_ROW_ANOMALIES = {("34", 1925, 16): ("広島県1925年「80～84歳（80歳以上）」の行は、総数列 7,648 に対し 男 3,064 + 女 4,534 = 7,598 で 50 人合わない。"
+                                         "全国表（第2表）は女＝総数−男（4,584）で合うため、第3表の女の値の誤記とみて女を 4,584 に直した。")}
+
+# 総数が年齢不詳を含まない年（census_ts3 脚注2・6で確認）。脚注2が不詳を含むとする年は 1940・1950・1955・1975〜2010
+# （2015・2020年は不詳補完値）。脚注6：沖縄県の1960・1965年は含む。1945年の沖縄県は missing
+NO_UNKNOWN_YEARS = (1920, 1925, 1930, 1935, 1945, 1960, 1965, 1970)
+UNKNOWN_EXCEPTIONS = {(OKINAWA, 1960), (OKINAWA, 1965)}
 
 
 # ---------------------------------------------------------------- 検証本体
@@ -196,7 +199,7 @@ def check_row_anomalies(rep, anomalies):
     for a in anomalies:
         key = (a["area"], a["year"], a["group"])
         msg = KNOWN_ROW_ANOMALIES.get(key)
-        if msg and a["both"] - a["male"] - a["female"] == 50:
+        if msg and a.get("fixed") == "female" and (a["from"], a["to"]) == (4534, 4584):
             rep.add("WARN", "row-anomalies", msg, area=a["area"], year=a["year"])
         else:
             rep.add("FAIL", "row-anomalies", f"{a['label']} の行で 総数 {a['both']} ≠ 男 {a['male']} + 女 {a['female']}",
@@ -233,6 +236,58 @@ def check_pref_sums(rep, doc, ts3, c2025):
                 rep.add("FAIL", "pref-sums", "; ".join(problems), area=code, year=y)
             elif y in (2015, 2020) and (um or uf):
                 rep.add("FAIL", "pref-sums", f"不詳補完値の年なのに不詳が {um}+{uf}", area=code, year=y)
+
+
+def check_unknown_zero(rep, doc):
+    """総数が不詳を含まない年は、都道府県の unknown が 0（例外は沖縄県の1960・1965年）。"""
+    rep.ran("unknown-zero")
+    for a in doc["areas"]:
+        for y in NO_UNKNOWN_YEARS:
+            e = doc["series"][a["code"]][str(y)]
+            if e["missing"] or (a["code"], y) in UNKNOWN_EXCEPTIONS:
+                continue
+            if e["unknown"]["male"] or e["unknown"]["female"]:
+                rep.add("FAIL", "unknown-zero", f"総数が不詳を含まない年なのに unknown が {e['unknown']['male']}+{e['unknown']['female']}",
+                        area=a["code"], year=y)
+
+
+def national_2025_groups(pyramid):
+    """data/pyramid.json の2025年（各歳 male/female）を5歳階級に合計し、85〜100+ を合算した {sex: [18]}。"""
+    y = next(r for r in pyramid["years"] if r["year"] == 2025)
+    out = {}
+    for sex in ("male", "female"):
+        ages = [v or 0 for v in y[sex]]
+        out[sex] = [sum(ages[g * 5:g * 5 + 5]) for g in range(17)] + [sum(ages[85:])]
+    return out
+
+
+def check_national_2025(rep, doc, pyramid):
+    """regions の national 2025年を、全国版 pyramid.json の2025年と段ごと・男女ごとに完全一致で照合。"""
+    rep.ran("national-2025-vs-pyramid")
+    if pyramid is None:
+        rep.add("FAIL", "national-2025-vs-pyramid", "data/pyramid.json を読めないため2025年を照合できません", year=2025)
+        return
+    want = national_2025_groups(pyramid)
+    e = doc["series"]["national"]["2025"]
+    for sex in ("male", "female"):
+        for i in range(N):
+            if e[sex][i] != want[sex][i]:
+                rep.add("FAIL", "national-2025-vs-pyramid",
+                        f"{sex} {AGE_GROUPS[i]}: regions {e[sex][i]} ≠ pyramid.json {want[sex][i]}", area="national", year=2025)
+
+
+def check_plausibility(rep, doc):
+    """都道府県ごとに、2020→2025年の総数比と男女比が妥当な範囲か（WARN）。"""
+    rep.ran("plausibility")
+    for a in doc["areas"]:
+        s = doc["series"][a["code"]]
+        r = s["2025"]["total"] / s["2020"]["total"]
+        if not 0.85 <= r <= 1.10:
+            rep.add("WARN", "plausibility", f"2020→2025年の総数比 {r:.3f} が 0.85〜1.10 の範囲外", area=a["code"], year=2025)
+        e = s["2025"]
+        sr = sum(v for v in e["male"] if v is not None) / sum(v for v in e["female"] if v is not None)
+        if not 0.85 <= sr <= 1.15:
+            rep.add("WARN", "plausibility", f"2025年の男女比（男/女）{sr:.3f} が 0.85〜1.15 の範囲外", area=a["code"], year=2025)
 
 
 def check_total_2025(rep, doc):
@@ -396,7 +451,7 @@ def check_schema(rep, doc, schema):
         rep.add("FAIL", "schema", f"{'/'.join(str(p) for p in e.absolute_path)}: {e.message}")
 
 
-def verify(doc, ts3, shapes, anomalies, kazoe, ts2, schema, c2025):
+def verify(doc, ts3, shapes, anomalies, kazoe, ts2, schema, c2025, pyramid=None):
     rep = Report()
     check_structure(rep, doc)
     check_shapes(rep, ts3, shapes)
@@ -404,6 +459,9 @@ def verify(doc, ts3, shapes, anomalies, kazoe, ts2, schema, c2025):
     check_row_anomalies(rep, anomalies)
     check_pref_sums(rep, doc, ts3, c2025)
     total2025 = check_total_2025(rep, doc)
+    check_unknown_zero(rep, doc)
+    check_national_2025(rep, doc, pyramid)
+    check_plausibility(rep, doc)
     listed = check_ts2(rep, doc, ts2)
     check_blocks(rep, doc)
     check_entries(rep, doc)

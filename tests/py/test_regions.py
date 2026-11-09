@@ -180,6 +180,76 @@ class RealDataTest(unittest.TestCase):
     def test_only_known_anomaly(self):
         self.assertEqual([(a["area"], a["year"], a["group"]) for a in self.anomalies], [("34", 1925, 16)])
 
+    def test_hiroshima_1925_fixed(self):
+        a = self.anomalies[0]
+        self.assertEqual((a["fixed"], a["from"], a["to"]), ("female", 4534, 4584))
+        raw = self.ts3["34"]["years"][1925]
+        self.assertEqual((raw["male"][16], raw["female"][16]), (3064, 4584))
+        self.assertEqual(sum(raw["female"]), raw["totalFemale"])  # 直した結果、不詳は0
+
+
+@unittest.skipUnless(have_raw(), "data/raw に census_ts3/ts2/2025 がありません（build_regions.py を先に実行）")
+class VerifyInjectionTest(unittest.TestCase):
+    """2025年と unknown の検証が、人工的に入れた誤りを捕まえること。"""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(ROOT, "data", "regions.json"), encoding="utf-8") as f:
+            cls.doc = json.load(f)
+        with open(os.path.join(ROOT, "data", "pyramid.json"), encoding="utf-8") as f:
+            cls.pyramid = json.load(f)
+
+    def run_check(self, fn, *args):
+        rep = regions_verify.Report()
+        fn(rep, *args)
+        return rep
+
+    def doc_copy(self):
+        return json.loads(json.dumps(self.doc))
+
+    def test_national_2025_clean(self):
+        rep = self.run_check(regions_verify.check_national_2025, self.doc, self.pyramid)
+        self.assertEqual(rep.count("FAIL"), 0)
+
+    def test_national_2025_sex_swap(self):
+        doc = self.doc_copy()
+        e = doc["series"]["national"]["2025"]
+        e["male"], e["female"] = e["female"], e["male"]
+        rep = self.run_check(regions_verify.check_national_2025, doc, self.pyramid)
+        self.assertGreater(rep.count("FAIL"), 0)
+
+    def test_national_2025_group_shift(self):
+        doc = self.doc_copy()
+        e = doc["series"]["national"]["2025"]
+        for sex in ("male", "female"):
+            e[sex] = e[sex][1:] + [e[sex][-1]]
+        rep = self.run_check(regions_verify.check_national_2025, doc, self.pyramid)
+        self.assertGreater(rep.count("FAIL"), 0)
+
+    def test_national_2025_missing_pyramid_fails(self):
+        rep = self.run_check(regions_verify.check_national_2025, self.doc, None)
+        self.assertGreater(rep.count("FAIL"), 0)
+
+    def test_plausibility_warns(self):
+        self.assertEqual(self.run_check(regions_verify.check_plausibility, self.doc).count("WARN"), 0)
+        doc = self.doc_copy()
+        doc["series"]["13"]["2025"]["total"] *= 2
+        doc["series"]["01"]["2025"]["male"] = [v * 3 if v is not None else None for v in doc["series"]["01"]["2025"]["male"]]
+        rep = self.run_check(regions_verify.check_plausibility, doc)
+        self.assertEqual(sorted(f["area"] for f in rep.findings), ["01", "13"])
+        self.assertEqual(rep.count("FAIL"), 0)
+
+    def test_unknown_zero(self):
+        self.assertEqual(self.run_check(regions_verify.check_unknown_zero, self.doc).count("FAIL"), 0)
+        for code, y in (("34", 1925), ("13", 1970), ("01", 1920)):
+            doc = self.doc_copy()
+            doc["series"][code][str(y)]["unknown"]["male"] = 1
+            self.assertEqual(self.run_check(regions_verify.check_unknown_zero, doc).count("FAIL"), 1, (code, y))
+        # 沖縄県の1960年は例外
+        doc = self.doc_copy()
+        doc["series"]["47"]["1960"]["unknown"]["male"] = 1
+        self.assertEqual(self.run_check(regions_verify.check_unknown_zero, doc).count("FAIL"), 0)
+
 
 @unittest.skipUnless(have_raw(), "data/raw に census_ts3/ts2/2025 がありません（build_regions.py を先に実行）")
 class BuildTest(unittest.TestCase):
@@ -193,6 +263,7 @@ class BuildTest(unittest.TestCase):
         os.makedirs(os.path.join(data, "raw"))
         shutil.copytree(os.path.join(ROOT, "data", "schema"), os.path.join(data, "schema"))
         shutil.copy(os.path.join(ROOT, "data", "sources.lock.json"), os.path.join(data, "sources.lock.json"))
+        shutil.copy(os.path.join(ROOT, "data", "pyramid.json"), os.path.join(data, "pyramid.json"))
         for f in RAW_FILES:
             os.symlink(os.path.join(RAW, f), os.path.join(data, "raw", f))
         self.data = data

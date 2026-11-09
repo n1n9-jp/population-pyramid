@@ -81,25 +81,45 @@ export function createControls({ store }) {
   render();
 }
 
-/** 凡例：男女の色、全国の参照線、共通の横軸（目盛りは1つだけ）。 */
-export function createLegend({ data }) {
+/**
+ * 凡例：男女の色、全国の参照線、共通の横軸（目盛りは1つだけ）。
+ * 軸の片側の幅は、描画中のタイルの片側の実寸（px）に合わせ、update() のたびに描き直す。
+ */
+export function createLegend({ data, container }) {
   const d3 = window.d3;
   const svg = d3.select($("legend-axis"));
-  const W = 280, H = 44, cx = W / 2, half = 112;
-  svg.attr("viewBox", `0 0 ${W} ${H}`).attr("width", W).attr("height", H);
-  const x = d3.scaleLinear().domain([0, data.xMaxShare]).range([0, half]);
-  const step = data.xMaxShare >= 0.06 ? 0.025 : data.xMaxShare >= 0.03 ? 0.01 : 0.005;
-  svg.append("line").attr("class", "axis-line").attr("x1", cx - half).attr("x2", cx + half).attr("y1", 10).attr("y2", 10);
-  for (let v = 0; v <= data.xMaxShare + 1e-9; v += step) {
-    for (const s of v === 0 ? [0] : [-1, 1]) {
-      const px = cx + s * x(v);
-      svg.append("line").attr("class", "axis-tick").attr("x1", px).attr("x2", px).attr("y1", 6).attr("y2", 14);
-      svg.append("text").attr("class", "axis-text").attr("x", px).attr("y", 28).attr("text-anchor", "middle")
-        .text(`${+(v * 100).toFixed(1)}`);
-    }
+  const PAD = 16, H = 44;
+
+  function tileHalfPx() {
+    const el = container.querySelector(".tile-svg");
+    const w = el ? el.getBoundingClientRect().width : 0;
+    return w > 0 ? (TILE.halfWidth * w) / TILE.width : null;
   }
-  svg.append("text").attr("class", "axis-text").attr("x", cx).attr("y", 41).attr("text-anchor", "middle")
-    .text("総人口に占める割合（%）");
+
+  function update() {
+    const half = tileHalfPx();
+    if (half == null) return;
+    const W = Math.ceil(2 * half + 2 * PAD), cx = W / 2;
+    svg.selectAll("*").remove();
+    svg.attr("viewBox", `0 0 ${W} ${H}`).attr("width", W).attr("height", H).attr("data-half-px", half.toFixed(2));
+    const x = d3.scaleLinear().domain([0, data.xMaxShare]).range([0, half]);
+    const step = data.xMaxShare >= 0.06 ? 0.025 : data.xMaxShare >= 0.03 ? 0.01 : 0.005;
+    svg.append("line").attr("class", "axis-line").attr("x1", cx - half).attr("x2", cx + half).attr("y1", 10).attr("y2", 10);
+    for (let v = 0; v <= data.xMaxShare + 1e-9; v += step) {
+      for (const s of v === 0 ? [0] : [-1, 1]) {
+        const px = cx + s * x(v);
+        svg.append("line").attr("class", "axis-tick").attr("x1", px).attr("x2", px).attr("y1", 6).attr("y2", 14);
+        svg.append("text").attr("class", "axis-text").attr("x", px).attr("y", 28).attr("text-anchor", "middle")
+          .text(`${+(v * 100).toFixed(1)}`);
+      }
+    }
+    svg.append("text").attr("class", "axis-text").attr("x", cx).attr("y", 41).attr("text-anchor", "middle")
+      .text("総人口に占める割合（%）");
+  }
+
+  new ResizeObserver(update).observe(container);
+  update();
+  return { update };
 }
 
 export function createTooltip({ data, store, tiles, wrap, container }) {
@@ -107,10 +127,12 @@ export function createTooltip({ data, store, tiles, wrap, container }) {
   let shown = null; // {id, group}
 
   function ageText(g, sh, kazoe) {
-    const k = kazoe ? "数え年" : "";
-    const label = data.ageGroups[g];
-    if (g === sh.open) return `${k}${label.split(/[-+]/)[0]}歳以上`;
-    return `${k}${label.replace("-", "〜")}歳`;
+    const lo = Number(data.ageGroups[g].split(/[-+]/)[0]);
+    if (kazoe) {
+      // 数え年は 0〜4 の段が数え年1〜5歳（上位区分は 86歳以上 など）
+      return g === sh.open ? `数え年${lo + 1}歳以上` : `数え年${lo + 1}〜${lo + 5}歳`;
+    }
+    return g === sh.open ? `${lo}歳以上` : `${lo}〜${lo + 4}歳`;
   }
 
   function content(id, group) {
@@ -208,7 +230,10 @@ export function createSources({ data }) {
   for (const [id, s] of Object.entries(data.sources)) {
     const li = document.createElement("li");
     const a = document.createElement("a");
-    a.href = s.url; a.rel = "noopener"; a.textContent = s.title;
+    a.href = s.url; a.rel = "noopener";
+    // 同じ題名の表を区別できるよう、表番号（「第3表」など）を含める
+    const num = /^第[0-9０-９－-]+表/.exec(s.table);
+    a.textContent = num ? `${s.title} ${num[0]}` : s.title;
     li.append(a, document.createTextNode(`（${s.table}）`));
     li.dataset.source = id;
     ul.append(li);

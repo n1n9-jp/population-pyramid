@@ -35,7 +35,7 @@ async function main() {
   createReadout({ data, store });
   createFacetToggle({ store });
   createControls({ store });
-  createLegend({ data });
+  const legend = createLegend({ data, container });
   createTooltip({ data, store, tiles, wrap, container });
   createSources({ data });
   createTimeline({
@@ -44,10 +44,12 @@ async function main() {
   });
 
   tiles.build(store.getState().facet);
+  legend.update();
   tiles.show(store.getState().yearIndex, { animate: false });
   store.subscribe((s, c) => {
     if (c.type === "facet") {
       tiles.build(s.facet);
+      legend.update();
       tiles.show(s.yearIndex, { animate: false });
     } else if (c.type === "year") {
       tiles.show(s.yearIndex, { animate: true });
