@@ -97,15 +97,13 @@ def fetch_all(raw_dir, lock_path, refresh=False, offline=False, today=None, log=
                 raise FetchError(f"--offline ですが {path} がありません")
             log(f"取得: {sid} <- {src['url']}")
             _download(src["url"], path)
-            fetched = True
-        else:
-            fetched = False
         with open(path, "rb") as f:
             if f.read(2) != b"PK":
                 raise FetchError(f"{path} は xlsx ではありません（先頭2バイトが PK でない）")
         digest = sha256_of(path)
         prev = old.get(sid, {})
-        retrieved = today if fetched or prev.get("sha256") != digest else prev.get("retrieved", today)
+        # 内容（sha256）が前回と同じなら、再取得しても前回の取得日を保つ
+        retrieved = prev.get("retrieved", today) if prev.get("sha256") == digest else today
         lock[sid] = {"file": src["file"], "url": src["url"], "sha256": digest, "retrieved": retrieved}
     write_lock(lock_path, lock)
     return lock

@@ -14,8 +14,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)  # python3 -I でも scripts/ 配下を import できるように
 
-from pyramid_data import (fetch, merge, parse_census2025, parse_est, parse_lt2000,  # noqa: E402
-                          verify, writers)
+from pyramid_data import (common, fetch, merge, parse_census2025, parse_est,  # noqa: E402
+                          parse_lt1920, parse_lt2000, verify, writers)
 
 
 def main(argv=None) -> int:
@@ -39,27 +39,29 @@ def main(argv=None) -> int:
     def p(sid):
         return os.path.join(raw, fetch.SOURCES[sid]["file"])
 
-    tables = []
-    partial_missing = []
     try:
-        from pyramid_data import parse_lt1920
+        tables = []
         tables += parse_lt1920.parse(p("lt1920"))
-    except ImportError:
-        partial_missing.append("lt1920")
-        print("警告: parse_lt1920 が見つからないため lt1920 の年（1920–1999）を除いて処理します", file=sys.stderr)
-    tables += parse_lt2000.parse(p("lt2000"))
-    for y in (2021, 2022, 2023, 2024):
-        tables += parse_est.parse(p(f"est{y}"))
-    tables += parse_census2025.parse(p("census2025"))
-
-    chosen, by_key = merge.merge(tables, allow_missing_sources=partial_missing)
-    doc = writers.build_document(chosen, lock)
-    with open(os.path.join(data, "schema", "pyramid.schema.json"), encoding="utf-8") as f:
-        schema = json.load(f)
-    rep = verify.verify(doc, chosen, by_key, schema, partial_missing)
+        tables += parse_lt2000.parse(p("lt2000"))
+        for y in (2021, 2022, 2023, 2024):
+            tables += parse_est.parse(p(f"est{y}"))
+        tables += parse_census2025.parse(p("census2025"))
+        chosen, by_key = merge.merge(tables)
+        doc = writers.build_document(chosen, lock)
+        with open(os.path.join(data, "schema", "pyramid.schema.json"), encoding="utf-8") as f:
+            schema = json.load(f)
+        rep = verify.verify(doc, chosen, by_key, schema, [])
+    except (common.ParseError, parse_lt1920.ParseError, merge.MergeError) as e:
+        msg = f"{type(e).__name__}: {e}"
+        print(f"構築失敗: {msg}", file=sys.stderr)
+        writers.write_report(
+            {"result": "FAIL", "counts": {"FAIL": 1, "WARN": 0}, "checks": [], "stats": {},
+             "findings": [{"level": "FAIL", "check": "build", "message": msg}]}, data)
+        return 1
     report = verify.to_report(rep, doc)
     writers.write_report(report, data)
-    writers.write_all(doc, data)
+    if not report["counts"]["FAIL"]:
+        writers.write_all(doc, data)
 
     print(f"検証: {report['result']}（FAIL {report['counts']['FAIL']} / WARN {report['counts']['WARN']}）")
     for f in report["findings"]:

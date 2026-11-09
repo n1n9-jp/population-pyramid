@@ -97,6 +97,93 @@ class FetchTest(unittest.TestCase):
             self.assertEqual(again, lock)  # 内容が同じなら取得日は変わらない
             self.assertEqual(set(lock), {"lt1920", "lt2000", "est2021", "est2022", "est2023", "est2024", "census2025"})
 
+    def test_refresh_same_content_keeps_retrieved(self):
+        with tempfile.TemporaryDirectory() as d:
+            rd, lock_path = os.path.join(d, "raw"), os.path.join(d, "lock.json")
+            os.makedirs(rd)
+            for src in fetch.SOURCES.values():
+                with open(os.path.join(rd, src["file"]), "wb") as f:
+                    f.write(b"PK-test-" + src["file"].encode())
+            lock = fetch.fetch_all(rd, lock_path, offline=True, today="2026-01-01", log=lambda *_: None)
+
+            def same(url, dest):  # 同じ内容を再取得したことにする
+                src = next(s for s in fetch.SOURCES.values() if s["url"] == url)
+                with open(dest, "wb") as f:
+                    f.write(b"PK-test-" + src["file"].encode())
+
+            orig, fetch._download = fetch._download, same
+            try:
+                again = fetch.fetch_all(rd, lock_path, refresh=True, today="2030-01-01", log=lambda *_: None)
+            finally:
+                fetch._download = orig
+            self.assertEqual(again, lock)
+
+
+class BuildFailureTest(unittest.TestCase):
+    def setUp(self):
+        import build_data
+
+        self.bd = build_data
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        d = self.tmp.name
+        os.makedirs(os.path.join(d, "data", "schema"))
+        os.makedirs(os.path.join(d, "data", "raw"))
+        shutil.copy(os.path.join(ROOT, "data", "schema", "pyramid.schema.json"), os.path.join(d, "data", "schema"))
+        for src in fetch.SOURCES.values():
+            with open(os.path.join(d, "data", "raw", src["file"]), "wb") as f:
+                f.write(b"PK-test")
+        self.data = os.path.join(d, "data")
+
+    def run_main(self):
+        import contextlib
+        import io
+
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = self.bd.main(["--offline", "--root", self.tmp.name])
+        return code, err.getvalue()
+
+    def test_parse_error_exits_1_with_report(self):
+        from pyramid_data import common
+
+        def boom(_path):
+            raise common.ParseError("壊れた表")
+
+        orig, parse_lt2000.parse = parse_lt2000.parse, boom
+        self.addCleanup(setattr, parse_lt2000, "parse", orig)
+        self.addCleanup(setattr, self.bd.parse_lt1920, "parse", self.bd.parse_lt1920.parse)
+        self.bd.parse_lt1920.parse = lambda _p: []
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("壊れた表", err)
+        with open(os.path.join(self.data, "build_report.json"), encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["result"], "FAIL")
+        self.assertFalse(os.path.exists(os.path.join(self.data, "pyramid.json")))
+
+    def test_verify_fail_writes_only_report(self):
+        self.addCleanup(setattr, self.bd.parse_lt1920, "parse", self.bd.parse_lt1920.parse)
+        self.bd.parse_lt1920.parse = lambda _p: []
+        for mod in (parse_lt2000, parse_census2025):
+            self.addCleanup(setattr, mod, "parse", mod.parse)
+            mod.parse = lambda _p: []
+        self.addCleanup(setattr, parse_est, "parse", parse_est.parse)
+        parse_est.parse = lambda _p: []
+        self.addCleanup(setattr, self.bd.merge, "merge", self.bd.merge.merge)
+        self.bd.merge.merge = lambda tables: ([], {})
+        self.addCleanup(setattr, self.bd.writers, "build_document", self.bd.writers.build_document)
+        self.bd.writers.build_document = lambda chosen, lock: {}
+        self.addCleanup(setattr, self.bd.verify, "verify", self.bd.verify.verify)
+        self.addCleanup(setattr, self.bd.verify, "to_report", self.bd.verify.to_report)
+        self.bd.verify.verify = lambda *a: object()
+        self.bd.verify.to_report = lambda rep, doc: {
+            "result": "FAIL", "counts": {"FAIL": 1, "WARN": 0}, "findings": []}
+        code, _ = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertTrue(os.path.exists(os.path.join(self.data, "build_report.json")))
+        for n in ("pyramid.json", "population_by_age.csv", "population_totals.csv"):
+            self.assertFalse(os.path.exists(os.path.join(self.data, n)), n)
+
 
 @unittest.skipUnless(have("lt2000.xlsx"), "data/raw/lt2000.xlsx がありません")
 class Lt2000Test(unittest.TestCase):
