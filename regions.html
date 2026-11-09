@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>都道府県・地方別の人口ピラミッド 1920–2025</title>
+  <meta name="description" content="1920年から2025年までの都道府県・地方別の人口ピラミッドを、日本地図風に並べて一斉に動かして比べられます。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/regions.css">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+  <script>
+    // module スクリプトは file:// で読めないため、通常のスクリプトで案内を出す
+    if (location.protocol === "file:") {
+      document.addEventListener("DOMContentLoaded", function () {
+        var wrap = document.getElementById("tiles-wrap");
+        if (!wrap) return;
+        var p = document.createElement("p");
+        p.id = "chart-error";
+        p.setAttribute("role", "alert");
+        p.textContent = "このページはローカルファイルとしては開けません。リポジトリ直下で `python3 -m http.server 8000` を実行し、http://localhost:8000/regions.html を開いてください。";
+        wrap.replaceChildren(p);
+      });
+    }
+  </script>
+  <script type="module" src="js/regions/main.js"></script>
+</head>
+<body>
+  <div id="fixture-banner" class="fixture-banner" hidden>サンプルデータ（実際の統計ではありません）</div>
+  <div class="page page-wide">
+    <header class="site-header">
+      <h1>都道府県・地方別の人口ピラミッド <span class="range">1920–2025</span></h1>
+      <p class="page-nav"><a href="index.html">← 全国の各歳別ピラミッド</a></p>
+      <p class="lede">47都道府県または8つの地方を、日本地図のように並べました。再生ボタンを押すか、下のスライダーで年を選ぶと、すべての地域が一斉に動きます。</p>
+    </header>
+
+    <main>
+      <section id="viewer" aria-label="地域別の人口ピラミッド">
+        <div class="viewer-top">
+          <div id="facet-toggle" class="facet-toggle" role="group" aria-label="表示する単位">
+            <button type="button" data-facet="prefecture" aria-pressed="true">都道府県</button>
+            <button type="button" data-facet="block" aria-pressed="false">地方</button>
+          </div>
+        </div>
+
+        <div class="readout">
+          <div class="year-row">
+            <div id="year-display" aria-live="polite"></div>
+            <div id="wareki-display"></div>
+            <div id="badges" class="badges"></div>
+          </div>
+          <div id="year-meta" class="year-meta"></div>
+          <div id="total-display" class="total"></div>
+        </div>
+
+        <div id="tiles-wrap" class="tiles-wrap">
+          <div id="tiles" class="tiles"></div>
+          <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+        </div>
+
+        <div class="controls controls-sticky">
+          <div class="buttons">
+            <button type="button" id="btn-rewind" class="btn" aria-label="最初に戻る">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>
+            </button>
+            <button type="button" id="btn-play" class="btn btn-primary" aria-label="再生"></button>
+            <span id="year-compact" class="year-compact" aria-hidden="true"></span>
+          </div>
+          <div id="timeline" class="timeline">
+            <svg id="timeline-svg" aria-hidden="true"></svg>
+            <input type="range" id="year-slider" min="0" max="21" step="1" value="0" aria-label="年">
+          </div>
+        </div>
+
+        <div class="legend" aria-label="凡例">
+          <ul class="legend-items">
+            <li><i class="swatch swatch-male"></i>男性（タイルの左）</li>
+            <li><i class="swatch swatch-female"></i>女性（タイルの右）</li>
+            <li><svg class="swatch-line" viewBox="0 0 24 10" aria-hidden="true"><path d="M1 8H8V5H15V2H23"/></svg>全国（同じ年）</li>
+          </ul>
+          <svg id="legend-axis" class="legend-axis" role="img" aria-label="横軸：各年齢階級が地域の総人口に占める割合。全タイル・全年で共通"></svg>
+          <p class="legend-note">棒は5歳ごとの年齢階級で、下が0〜4歳、上が高齢です。横軸は全タイル・全年で共通です。タイルの右上の%は65歳以上の割合です。</p>
+        </div>
+
+        <div class="notes">
+          <h2>この年についての注記</h2>
+          <ul id="notes-list"></ul>
+        </div>
+      </section>
+
+      <section id="about" class="about">
+        <h2>図の読み方</h2>
+        <p></p>
+      </section>
+    </main>
+
+    <footer id="sources" class="sources">
+      <h2>出典</h2>
+      <p id="attribution"></p>
+      <ul id="source-list"></ul>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,79 @@
+/* 地域別スモールマルティプルズ（regions.html）専用。共通部分は style.css を読み込む。 */
+.page.page-wide { max-width: 1100px; }
+.site-header .page-nav { margin: 0 0 4px; }
+
+.viewer-top { display: flex; justify-content: flex-start; margin: 4px 0 6px; }
+.facet-toggle { display: inline-flex; border: 1px solid var(--muted); border-radius: 999px; overflow: hidden; background: #fffdf6; }
+.facet-toggle button {
+  font: inherit; font-size: 14px; line-height: 1; color: var(--ink); background: transparent;
+  border: 0; padding: 0 16px; min-height: 36px; cursor: pointer;
+}
+.facet-toggle button + button { border-left: 1px solid var(--muted); }
+.facet-toggle button[aria-pressed="true"] { background: var(--male-strong); color: #fff; font-weight: 700; }
+.facet-toggle button:focus-visible { outline-offset: -2px; }
+
+/* タイル群 */
+.tiles-wrap { position: relative; margin-top: 6px; }
+.tiles { display: grid; gap: 4px; margin: 0 auto; width: 100%; }
+.tiles.facet-prefecture { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tiles.facet-block { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 560px; }
+.tile {
+  position: relative; min-width: 0; border: 1px solid var(--grid); border-radius: 3px;
+  padding: 2px 3px 3px; background: var(--bg); cursor: crosshair; touch-action: manipulation;
+}
+.tile-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+  column-gap: 2px; line-height: 12px; min-height: 12px; margin-bottom: 1px;
+}
+.tile-name { font-size: 10px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.tile-pct { font-size: 10px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tile-svg { display: block; width: 100%; height: auto; }
+.tile .center-line { stroke: var(--muted); stroke-width: 0.5; vector-effect: non-scaling-stroke; }
+.tile .bar.male { fill: var(--male); }
+.tile .bar.female { fill: var(--female); }
+.tile .national { stroke: #2a2620; stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; pointer-events: none; }
+.tile-missing {
+  position: absolute; left: 0; right: 0; bottom: 0; top: 14px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--muted); background: rgba(255, 255, 255, .8); text-align: center;
+}
+.tile.is-missing { border-style: dashed; }
+
+@media (min-width: 600px) {
+  .tiles.facet-prefecture { grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; }
+  .tiles.facet-block { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 760px; }
+  .tile { grid-column: calc(var(--gx) + 1); grid-row: calc(var(--gy) + 1); }
+  .facet-block .tile-name, .facet-block .tile-pct { font-size: 12px; }
+  .facet-block .tile-head { line-height: 16px; }
+}
+
+/* 操作部：地図をスクロールして見ていても届くように画面下に固定する */
+.controls-sticky {
+  position: sticky; bottom: 0; z-index: 4; background: var(--bg); border-top: 1px solid var(--grid);
+  padding: 6px 0 0; margin-top: 6px; align-items: center;
+}
+.buttons { align-items: center; }
+.year-compact { font-size: 18px; font-weight: 700; min-width: 3.6em; padding-left: 4px; }
+.timeline { height: 44px; }
+.timeline svg { height: 44px; }
+
+/* 凡例 */
+.legend { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 24px; }
+.legend-items { display: flex; flex-wrap: wrap; gap: 4px 16px; list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--muted); }
+.legend-items li { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.swatch-male { background: var(--male); }
+.swatch-female { background: var(--female); }
+.swatch-line { width: 24px; height: 10px; }
+.swatch-line path { fill: none; stroke: #2a2620; stroke-width: 1; }
+.legend-axis { max-width: 100%; height: auto; }
+.legend-axis text { fill: var(--muted); font-size: 10px; font-family: inherit; }
+.legend-axis .axis-line, .legend-axis .axis-tick { stroke: var(--muted); stroke-width: 1; shape-rendering: crispEdges; }
+.legend-note { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--muted); }
+.tip-age { margin-top: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+
+/* データなしのタイルは棒も参照線も描かない */
+.tile.is-missing .tile-svg { visibility: hidden; }
