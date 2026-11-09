@@ -34,7 +34,7 @@ def open_age(year: int) -> int:
         return OPEN_AGE_1951_1954[year]
     if year < 1980:
         return 85
-    if year < 2000:
+    if year < 2005:
         return 90
     return 100
 

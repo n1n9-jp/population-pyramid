@@ -11,10 +11,8 @@ may appear between years; each year uses the nearest label column to its left.
 1951–1954 end at 「80 歳以上」 (1952: 「79 歳以上」); ``year_meta`` already
 reflects this.
 
-Known disagreements with ``year_meta`` (checked strictly against the table
-labels via ``TABLE_OPEN_AGE``):
-- 2000 ends at 「90 歳以上」; ``year_meta(2000)`` describes lt2000 (100 歳以上),
-  so 2000 is returned with source_id "lt1920" and the merger prefers lt2000.
+2000 is returned with source_id "lt1920" (``year_meta(2000)`` names lt2000);
+the merger prefers lt2000.
 """
 from __future__ import annotations
 
@@ -31,10 +29,6 @@ LABEL_HEADER_ROWS = range(6, 10)
 FIRST_DATA_ROW = 10
 EXPECTED_YEARS = list(range(1920, 1941)) + list(range(1944, 2001))
 DASHES = {"－", "-", "‐", "−", "—", "―", "…", "***", "x", "X", ""}
-
-
-# Open age printed in the table where it differs from model.open_age().
-TABLE_OPEN_AGE = {2000: 90}
 
 
 class ParseError(ValueError):
@@ -125,7 +119,6 @@ def _parse_year(ws_title, rows, year, col, label_col, notes):
     min_age = meta["min_age"]
     open_age = meta["open_age"]
     src = meta["source_id"]
-    open_age = TABLE_OPEN_AGE.get(year, open_age)  # see module doc
     if year == 2000:
         src = SOURCE_ID
     if src != SOURCE_ID:

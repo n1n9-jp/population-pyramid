@@ -2,7 +2,6 @@ import os
 import unittest
 
 from scripts.pyramid_data.model import AGE_MAX, year_meta
-from scripts.pyramid_data.parse_lt1920 import TABLE_OPEN_AGE
 
 RAW = os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw", "lt1920.xlsx")
 EXPECTED_YEARS = list(range(1920, 1941)) + list(range(1944, 2001))
@@ -32,7 +31,7 @@ class TestParseLt1920(unittest.TestCase):
             with self.subTest(year=t.year):
                 for k in ("ref_date", "kazoe", "min_age", "excludes_okinawa", "basis", "precision"):
                     self.assertEqual(getattr(t, k), m[k], k)
-                self.assertEqual(t.open_age, TABLE_OPEN_AGE.get(t.year, m["open_age"]))
+                self.assertEqual(t.open_age, m["open_age"])
                 if t.year < 2000:
                     self.assertEqual(t.source_id, m["source_id"])
                 for arr in (t.male, t.female):

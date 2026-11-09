@@ -12,20 +12,6 @@ PUBLISHED_TOTALS = {1920: 55963000, 2000: 126926000, 2015: 127095000, 2020: 1261
 SUM_WARN = 10000  # 人（10 千人）
 
 
-def known_open_age_deviations() -> dict:
-    """表の最終区分が year_meta と異なることが確認済みの年 -> 表の open_age。"""
-    from . import parse_lt2000
-
-    dev = dict(parse_lt2000.KNOWN_OPEN_AGE)
-    try:
-        from . import parse_lt1920
-
-        dev.update({y: a for y, a in parse_lt1920.TABLE_OPEN_AGE.items() if y != 2000})
-    except ImportError:
-        pass
-    return dev
-
-
 class Report:
     def __init__(self):
         self.findings = []
@@ -61,22 +47,14 @@ def check_years_and_meta(rep, tables, partial_missing):
     elif not partial_missing and len(got) != 103:
         rep.add("FAIL", "years", f"年数が {len(got)}（103 であるべき）")
     rep.ran("meta")
-    dev = known_open_age_deviations()
     keys = ["ref_date", "kazoe", "min_age", "open_age", "excludes_okinawa", "basis", "source_id", "precision"]
-    warn_years = []
     for t in tables:
         m = year_meta(t.year)
         for k in keys:
             v = getattr(t, k)
             if v == m[k]:
                 continue
-            if k == "open_age" and dev.get(t.year) == v:
-                warn_years.append((t.year, v, m[k]))
-            else:
-                rep.add("FAIL", "meta", f"{k}={v!r} が year_meta の {m[k]!r} と不一致", t.year)
-    if warn_years:
-        rep.add("WARN", "meta", "表の最終区分が year_meta の open_age と異なる年（表のとおりに出力）: "
-                + ", ".join(f"{y}年={a}歳以上(meta {b})" for y, a, b in warn_years))
+            rep.add("FAIL", "meta", f"{k}={v!r} が year_meta の {m[k]!r} と不一致", t.year)
 
 
 def check_nulls(rep, tables):
@@ -105,11 +83,6 @@ def check_schema(rep, doc, schema, partial):
         return
     sch = copy.deepcopy(schema)
     notes = []
-    devs = sorted(set(known_open_age_deviations().values()) - set(sch["$defs"]["year"]["properties"]["openAge"]["enum"]))
-    if devs:
-        sch["$defs"]["year"]["properties"]["openAge"]["enum"] = sorted(
-            sch["$defs"]["year"]["properties"]["openAge"]["enum"] + devs)
-        notes.append(f"openAge の enum に {devs} を追加して検証")
     if partial:
         sch["properties"]["years"]["minItems"] = 0
         sch["properties"]["years"]["maxItems"] = 103
@@ -290,7 +263,7 @@ def check_notes(rep, doc):
         if have != ([w] if w else []):
             bad.append((y["year"], y["openAge"], have))
     if bad:
-        rep.add("WARN", "notes-vs-openage", "openAge と open-* 注記が食い違う年（notes は PLAN §3 のまま）: "
+        rep.add("FAIL", "notes-vs-openage", "openAge と open-* 注記が食い違う年: "
                 + ", ".join(f"{y}年(openAge={o}, 注記={h})" for y, o, h in bad))
 
 

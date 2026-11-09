@@ -200,7 +200,7 @@ class Lt2000Test(unittest.TestCase):
         self.assertIn("2015年～2020年", self.tables[2015].sheet)
         self.assertEqual(self.tables[2015].total_both, 127095000)
 
-    def test_open_age_quirk_2000_2004(self):
+    def test_open_age_2000_2004(self):
         t = self.tables[2000]
         self.assertEqual(t.open_age, 90)
         self.assertIsNone(t.male[91])

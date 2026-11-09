@@ -1,8 +1,7 @@
 """lt2000（2000–2020年、総人口シートのみ、千人→人）のパーサ。
 
-既知の食い違い：2000–2004年の列は「90歳以上」の合計が「95」の行に1つだけ入っており
-（90〜94・96〜99・100歳以上は空欄）、year_meta の open_age=100 と一致しない。
-表のとおり open_age=90 の YearTable として返す（KNOWN_OPEN_AGE）。
+2000–2004年の列は「90歳以上」の合計が「95」の行に1つだけ入っており
+（90〜94・96〜99・100歳以上は空欄）、year_meta の open_age=90 に従って読む。
 """
 from __future__ import annotations
 
@@ -15,7 +14,6 @@ from .model import AGE_MAX, YearTable, year_meta
 
 SOURCE_ID = "lt2000"
 SHEETS = ["総人口（2000年～2015年）", "総人口（2015年～2020年）"]  # 2015 は後のシート優先
-KNOWN_OPEN_AGE = {y: 90 for y in range(2000, 2005)}
 EXPECTED_YEARS = list(range(2000, 2021))
 
 
@@ -70,7 +68,7 @@ def _build(ws_title, year, col, rows, total_row, age_rows):
     if None in totals:
         raise ParseError(f"{year}: 総数が欠損")
     m_arr, f_arr, b_arr = [None] * (AGE_MAX + 1), [None] * (AGE_MAX + 1), [None] * (AGE_MAX + 1)
-    open_age = KNOWN_OPEN_AGE.get(year, m["open_age"])
+    open_age = m["open_age"]
     if open_age == 100:
         for a in range(101):
             for arr, ser in ((m_arr, male), (f_arr, female), (b_arr, both)):
@@ -94,9 +92,7 @@ def _build(ws_title, year, col, rows, total_row, age_rows):
         total_both=totals[0] * 1000, precision=m["precision"], excludes_okinawa=m["excludes_okinawa"],
         basis=m["basis"], source_id=SOURCE_ID, sheet=ws_title, both_by_age=b_arr,
     )
-    check_meta(t, year, open_age, KNOWN_OPEN_AGE.get(year))
-    if open_age != m["open_age"]:
-        t.raw_notes.append(f"表の最終区分は{open_age}歳以上（year_meta は{m['open_age']}）")
+    check_meta(t, year, open_age)
     return t
 
 
