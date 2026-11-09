@@ -3,18 +3,24 @@
 .site-header .page-nav { margin: 0 0 4px; }
 
 .viewer-top { display: flex; justify-content: flex-start; margin: 4px 0 6px; }
-.facet-toggle { display: inline-flex; border: 1px solid var(--muted); border-radius: 999px; overflow: hidden; background: #fffdf6; }
+.facet-toggle { display: inline-flex; border: 1px solid var(--muted); border-radius: 999px; background: #fffdf6; }
 .facet-toggle button {
   font: inherit; font-size: 14px; line-height: 1; color: var(--ink); background: transparent;
   border: 0; padding: 0 16px; min-height: 36px; cursor: pointer;
 }
 .facet-toggle button + button { border-left: 1px solid var(--muted); }
 .facet-toggle button[aria-pressed="true"] { background: var(--male-strong); color: #fff; font-weight: 700; }
-.facet-toggle button:focus-visible { outline-offset: -2px; }
+.facet-toggle button:first-child { border-radius: 999px 0 0 999px; }
+.facet-toggle button:last-child { border-radius: 0 999px 999px 0; }
+/* 選択中（#3e6593）の上でも見えるよう、内側に白、外側に濃い色のリングを重ねる */
+.facet-toggle button:focus-visible {
+  outline: 2px solid #1f2d40; outline-offset: 2px; position: relative; z-index: 1;
+  box-shadow: inset 0 0 0 2px #fff;
+}
 
 /* タイル群 */
 .tiles-wrap { position: relative; margin-top: 6px; }
-.tiles { display: grid; gap: 4px; margin: 0 auto; width: 100%; }
+.tiles { display: grid; gap: 4px; margin: 0; width: 100%; }
 .tiles.facet-prefecture { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .tiles.facet-block { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 560px; }
 .tile {
@@ -31,19 +37,33 @@
 .tile .center-line { stroke: var(--muted); stroke-width: 0.5; vector-effect: non-scaling-stroke; }
 .tile .bar.male { fill: var(--male); }
 .tile .bar.female { fill: var(--female); }
-.tile .national { stroke: #2a2620; stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; pointer-events: none; }
+.tile .national { stroke: #2a2620; stroke-opacity: .6; stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; pointer-events: none; }
 .tile-missing {
   position: absolute; left: 0; right: 0; bottom: 0; top: 14px; display: flex; align-items: center; justify-content: center;
   font-size: 10px; color: var(--muted); background: rgba(255, 255, 255, .8); text-align: center;
 }
 .tile.is-missing { border-style: dashed; }
 
+/* 600〜859px：コード順の格子（都道府県は6列、地方は4列） */
 @media (min-width: 600px) {
-  .tiles.facet-prefecture { grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; }
+  .tiles.facet-prefecture { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
   .tiles.facet-block { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 760px; }
-  .tile { grid-column: calc(var(--gx) + 1); grid-row: calc(var(--gy) + 1); }
   .facet-block .tile-name, .facet-block .tile-pct { font-size: 12px; }
   .facet-block .tile-head { line-height: 16px; }
+}
+/* 860px以上：地図配置 */
+@media (min-width: 860px) {
+  .tiles.facet-prefecture { grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; }
+  .tile { grid-column: calc(var(--gx) + 1); grid-row: calc(var(--gy) + 1); }
+  .viewer-head { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: flex-start; gap: 8px 16px; }
+  .viewer-head .viewer-top { margin: 8px 0 0; }
+  .site-header { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 16px; }
+  .site-header h1 { margin: 6px 0 2px; }
+  .site-header .page-nav { margin: 0; }
+  .site-header .lede { flex-basis: 100%; }
+  .readout .year-meta, .readout .total { display: inline-block; }
+  .readout .year-meta { margin-right: 16px; }
+  .site-header .lede { margin-bottom: 2px; }
 }
 
 /* 操作部：地図をスクロールして見ていても届くように画面下に固定する */
@@ -53,7 +73,7 @@
 }
 .buttons { align-items: center; }
 .year-compact { font-size: 18px; font-weight: 700; min-width: 3.6em; padding-left: 4px; }
-.timeline { height: 44px; }
+.timeline { height: 44px; margin-bottom: 8px; }
 .timeline svg { height: 44px; }
 
 /* 凡例 */
@@ -64,7 +84,7 @@
 .swatch-male { background: var(--male); }
 .swatch-female { background: var(--female); }
 .swatch-line { width: 24px; height: 10px; }
-.swatch-line path { fill: none; stroke: #2a2620; stroke-width: 1; }
+.swatch-line path { fill: none; stroke: #2a2620; stroke-opacity: .6; stroke-width: 1; }
 .legend-axis { max-width: 100%; height: auto; }
 .legend-axis text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 .legend-axis .axis-line, .legend-axis .axis-tick { stroke: var(--muted); stroke-width: 1; shape-rendering: crispEdges; }

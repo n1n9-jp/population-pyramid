@@ -11,10 +11,10 @@ function svgEl(name, attrs = {}) {
   return el;
 }
 
-/** 階段状の折れ線（下が0歳）。sign=-1 が男性（左）、+1 が女性（右）。 */
-function stepPath(widths, sign) {
+/** 階段状の折れ線（下が0歳）。sign=-1 が男性（左）、+1 が女性（右）。last は最後に描く段。 */
+function stepPath(widths, sign, last) {
   let d = `M${TILE.center},${VIEW_H}`;
-  for (let g = 0; g < GROUPS; g++) {
+  for (let g = 0; g <= last; g++) {
     d += `H${(TILE.center + sign * widths[g]).toFixed(2)}V${(GROUPS - 1 - g) * TILE.rowH}`;
   }
   return d + `H${TILE.center}`;
@@ -81,7 +81,7 @@ export function createTiles({ container, data, store }) {
       });
       el.append(head, svg);
       frag.append(el);
-      tiles.push({ id: item.id, el, pctEl, svg, bars, nat, item });
+      tiles.push({ id: item.id, el, pctEl, svg, bars, nat, item, natLast: GROUPS - 1 });
     }
     container.append(frag);
     flatBars = tiles.flatMap((t) => t.bars);
@@ -102,10 +102,15 @@ export function createTiles({ container, data, store }) {
         if (bar.sex < 0) bar.el.setAttribute("x", (TILE.center - w).toFixed(2));
       }
     }
-    const dM = stepPath(natCur[0], -1), dF = stepPath(natCur[1], 1);
+    const cache = new Map();
     for (const t of tiles) {
-      t.nat[0].setAttribute("d", dM);
-      t.nat[1].setAttribute("d", dF);
+      let ds = cache.get(t.natLast);
+      if (!ds) {
+        ds = [stepPath(natCur[0], -1, t.natLast), stepPath(natCur[1], 1, t.natLast)];
+        cache.set(t.natLast, ds);
+      }
+      t.nat[0].setAttribute("d", ds[0]);
+      t.nat[1].setAttribute("d", ds[1]);
     }
   }
 
@@ -125,6 +130,9 @@ export function createTiles({ container, data, store }) {
     for (const t of tiles) {
       const sh = data.shares[t.id][yi];
       t.el.classList.toggle("is-missing", sh.missing);
+      // 参照線は、全国と地域の上位区分の段のうち低い方の手前まで。区分が同じときだけ上位区分の段も描く
+      const lim = Math.min(nat.open, sh.open ?? nat.open);
+      t.natLast = nat.open === (sh.open ?? nat.open) ? lim : lim - 1;
       let missingEl = t.el.querySelector(".tile-missing");
       if (sh.missing && !missingEl) {
         missingEl = document.createElement("div");
