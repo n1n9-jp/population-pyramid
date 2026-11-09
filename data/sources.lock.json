@@ -1,0 +1,44 @@
+{
+  "census2025": {
+    "file": "census2025.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "5903643154799167cc94bf8301e342b2ba8a7a509cfe619f4e472e6dd78f86e4",
+    "url": "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000040506653&fileKind=0"
+  },
+  "est2021": {
+    "file": "est2021.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "390f5aa0dc48426baeaf11453de65471c01a2e7b90d981cc9f35735f973521b8",
+    "url": "https://www.stat.go.jp/data/jinsui/2021np/zuhyou/05k2021-1.xlsx"
+  },
+  "est2022": {
+    "file": "est2022.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "e22122c44085d2250251efb465c6021c82989a5d46154db7ae2cbdda6008afb1",
+    "url": "https://www.stat.go.jp/data/jinsui/2022np/zuhyou/05k2022-1.xlsx"
+  },
+  "est2023": {
+    "file": "est2023.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "bfaf28c66955ec1fbe5659310faa14f2365157972d6c1ea817402c44ae9a4218",
+    "url": "https://www.stat.go.jp/data/jinsui/2023np/zuhyou/05k2023-1.xlsx"
+  },
+  "est2024": {
+    "file": "est2024.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "0fb515bfb5bec519f306cbe22a81f170d65826ad472a173df2a485ffbe86b96e",
+    "url": "https://www.stat.go.jp/data/jinsui/2024np/zuhyou/05k2024-1.xlsx"
+  },
+  "lt1920": {
+    "file": "lt1920.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "cc2d3c0c0ce7ec160b1b145442a070b613407bcc7e1ddbc25d1a94aae788f559",
+    "url": "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000000090264&fileKind=0"
+  },
+  "lt2000": {
+    "file": "lt2000.xlsx",
+    "retrieved": "2026-11-09",
+    "sha256": "0282cf0edb64d449501072f3b733de4d0e2aea385a279b1c80226d2234b31192",
+    "url": "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000013168604&fileKind=4"
+  }
+}
