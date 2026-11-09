@@ -106,7 +106,7 @@ lt1920 パーサは 2000 年も返してよい（merge で lt2000 を優先）�
   - 出生年：満年齢の年は `{Y−a−1}年10月〜{Y−a}年9月生まれ`、上位区分の行は `{Y−openAge}年9月以前生まれ`。数え年の年は `{Y−k+1}年生まれ`、上位区分は `{Y−openAge+1}年以前生まれ`。
   - 人数：precision=1 なら `812,345人`。それ以外は1万以上で `(v/1e4).toFixed(1)+"万人"`（例 `123.4万人`）、1万未満は `3,000人`。null の行は「この年は{openAge}歳以上にまとめて表示」または「数え年のため0歳はありません」。
   - 総人口：`Math.round(v/1e4)` 万を億と万に分けて `1億2,297万人`／`5,596万人`。
-- コホートラベル `.cohort`：`js/config.js` に `{id:"dankai",label:"団塊の世代",short:"団塊",birthStart:1947,birthEnd:1949}`, `{id:"hinoeuma",label:"丙午",short:"丙午",birthStart:1966,birthEnd:1966}`, `{id:"dankai-jr",label:"団塊ジュニア",short:"団塊Jr",birthStart:1971,birthEnd:1974}`。満年齢の年だけ、年齢範囲 `[Y−birthEnd, Y−birthStart] ∩ [minAge, openAge−1]` に女性側の外側で括弧と名前を表示。範囲が空、または数え年の年は hidden。棒と同じ遷移で動く。
+- コホートラベル `.cohort`：`js/config.js` に `{id:"dankai",label:"団塊の世代",short:"団塊",birthStart:1947,birthEnd:1949}`, `{id:"hinoeuma",label:"丙午",short:"丙午",birthStart:1966,birthEnd:1966}`, `{id:"dankai-jr",label:"団塊ジュニア",short:"団塊Jr",birthStart:1971,birthEnd:1974}`。満年齢の年だけ、年齢範囲 `[Y−birthEnd, Y−birthStart] ∩ [minAge, openAge−1]` の行に、男性側の左端から女性側の右端まで年齢欄も含めて横長の薄い帯（`.cohort-band`、中立色 #5b5346 の不透明度0.08、棒・グリッドより後ろ）を敷き、女性側の外側に名前を表示。範囲が空、または数え年の年は hidden。棒と同じ遷移で動く。
 - データ表：`<details>` 内の `#data-table`（年齢・男性・女性・計の101行）と CSV へのリンク。
 - 出典欄：`attribution` と各 source の title・table・リンク。
 - 解説：`<section id="about">` に図の読み方の短い解説（後で事実を入れる。初期は見出しと空段落でよい）。
