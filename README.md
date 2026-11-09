@@ -54,6 +54,29 @@ node tests/e2e/smoke.cjs --base http://localhost:8000 --out docs/screenshots
 
 E2E は Playwright（`require('playwright')`）を使い、`--fixture` でサンプルデータ、指定なしで実データを検査します。`--out` を付けるとスクリーンショットを保存します。
 
+## 地域別ページ（regions.html）
+
+都道府県（47）または地方ブロック（8）ごとの小さな人口ピラミッドを並べ、1920〜2025年（5年ごと22時点）を1本のスライダーで一斉に動かします。<http://localhost:8000/regions.html> で開きます（`?year=1950`、`?facet=block`、`?fixture=1` が使えます）。
+
+**見方**：年齢は5歳階級。横軸は「その地域の総人口に占める割合」で、全タイル・全年で共通です。黒い線は同じ年の全国の形、タイルの数字は65歳以上の割合です。仕様は [docs/REGIONS.md](docs/REGIONS.md) にあります。
+
+**データ**（`data/raw/` に保存。取得元URLとSHA-256は `data/sources.lock.json`）：
+
+| source_id | 年 | 資料 | URL |
+|---|---|---|---|
+| census_ts3 | 1920–2020 | 国勢調査 時系列データ 第3表 年齢（5歳階級），男女別人口－都道府県 | <https://www.e-stat.go.jp/stat-search/file-download?statInfId=000001085927&fileKind=0> |
+| census_ts2 | 1920–2020 | 同 第2表（全国。照合にだけ使う） | <https://www.e-stat.go.jp/stat-search/file-download?statInfId=000001085926&fileKind=0> |
+| census2025 | 2025 | 令和7年国勢調査 人口等基本集計（不詳補完値） 第2－1表 | <https://www.e-stat.go.jp/stat-search/file-download?statInfId=000040506653&fileKind=0> |
+
+```sh
+python3 -I scripts/build_regions.py            # 取得・整形・検証（--offline は data/raw のみ）
+python3 -m http.server 8000 &
+node tests/e2e/regions.cjs --base http://localhost:8000 --fixture
+node tests/e2e/regions.cjs --base http://localhost:8000
+```
+
+`data/regions.json`、`data/regions_by_age.csv`、`data/regions_build_report.json` が生成されます。終了コードは 0=合格、1=検証FAIL、2=取得失敗です。`build_data.py` と `build_regions.py` は `data/sources.lock.json` を共有し、互いのキーを消しません。
+
 ## ファイル構成
 
 ```
