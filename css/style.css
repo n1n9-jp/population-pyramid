@@ -60,7 +60,7 @@ h2 { font-size: 16px; margin: 0 0 6px; }
 .row-focus { fill: rgba(42, 38, 32, .10); pointer-events: none; }
 .row-hit { fill: transparent; cursor: crosshair; }
 .leader { stroke: var(--muted); stroke-width: 1; pointer-events: none; }
-.cohort-bracket { fill: none; stroke: var(--muted); stroke-width: 1; }
+.cohort-band { fill: #5b5346; fill-opacity: .08; pointer-events: none; }
 .cohort-text { dominant-baseline: central; }
 @media (max-width: 599px) {
   .chart text { font-size: 10px; }

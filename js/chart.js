@@ -16,6 +16,15 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
 
   // --- 静的な要素（一度だけ作る） ---
   svg.attr("role", "img");
+  const gCohorts = svg.append("g").attr("class", "cohorts");
+  const cohortEls = COHORTS.map((c) => {
+    const g = gCohorts.append("g").attr("class", "cohort").attr("data-cohort", c.id)
+      .attr("data-age-min", "").attr("data-age-max", "").attr("hidden", "");
+    g.append("rect").attr("class", "cohort-band");
+    g.append("text").attr("class", "cohort-text");
+    return { c, g: g.node(), band: g.select("rect").node(), text: g.select("text").node(), range: null, top: 0, bottom: 0 };
+  });
+
   const gGrid = svg.append("g").attr("class", "grid");
   const gFocus = svg.append("g");
   const focusRect = gFocus.append("rect").attr("class", "row-focus").attr("hidden", "");
@@ -31,15 +40,6 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
     }
   }
   const idx = (sex, age) => (sex === "male" ? 0 : NB) + age;
-
-  const gCohorts = svg.append("g").attr("class", "cohorts");
-  const cohortEls = COHORTS.map((c) => {
-    const g = gCohorts.append("g").attr("class", "cohort").attr("data-cohort", c.id)
-      .attr("data-age-min", "").attr("data-age-max", "").attr("hidden", "");
-    g.append("path").attr("class", "cohort-bracket");
-    g.append("text").attr("class", "cohort-text");
-    return { c, g: g.node(), path: g.select("path").node(), text: g.select("text").node(), range: null, top: 0, bottom: 0 };
-  });
 
   const leader = svg.append("line").attr("class", "leader").attr("hidden", "");
   const gHits = svg.append("g").attr("class", "hits");
@@ -202,6 +202,7 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
       c.g.setAttribute("data-age-min", r[0]);
       c.g.setAttribute("data-age-max", r[1]);
       c.next = { top: yTop(r[1]), bottom: yTop(r[0]) + layout.rowHeight };
+      c.fadeIn = !wasShown;
       c.from = wasShown ? { top: c.top, bottom: c.bottom } : c.next;
     }
   }
@@ -211,12 +212,17 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
     const e = c.from;
     c.top = e.top + (c.next.top - e.top) * t;
     c.bottom = e.bottom + (c.next.bottom - e.bottom) * t;
-    const x = layout.xFemale + layout.halfWidth + 6;
+    const x0 = layout.margin.left;
+    const x1 = layout.xFemale + layout.halfWidth;
     const mid = (c.top + c.bottom) / 2;
-    const k = 4;
-    const h = Math.max(c.bottom - c.top - 1, 8); // 1歳分でも括弧が潰れないよう最低8px
-    c.path.setAttribute("d", `M${x},${mid - h / 2} h${k} V${mid + h / 2} h${-k}`);
-    c.text.setAttribute("x", x + k + 4);
+    c.band.setAttribute("x", x0);
+    c.band.setAttribute("width", Math.max(0, x1 - x0));
+    c.band.setAttribute("y", c.top);
+    c.band.setAttribute("height", Math.max(0, c.bottom - c.top));
+    c.band.setAttribute("opacity", c.fadeIn ? t : 1);
+    c.text.setAttribute("opacity", c.fadeIn ? t : 1);
+    const x = x1 + 6;
+    c.text.setAttribute("x", x);
     c.text.setAttribute("y", mid);
   }
 
