@@ -73,12 +73,6 @@ const readBars = (page) =>
       sex: r.dataset.sex, age: +r.dataset.age, value: r.dataset.value, w: r.getBoundingClientRect().width,
     })));
 
-function estimateHalfWidth(bars, xMax) {
-  let best = null;
-  for (const b of bars) if (b.value !== '' && +b.value > 0 && (!best || +b.value > +best.value)) best = b;
-  assert(best, '値が正の棒がありません');
-  return (best.w * xMax) / +best.value;
-}
 function verifyBars(bars, rec, xMax, hw, tol = 0.5) {
   const bad = [];
   for (const b of bars) {
@@ -101,7 +95,8 @@ function fmtPeople(v, precision) {
 function fmtTotal(v) {
   const m = Math.round(v / 1e4);
   const oku = Math.floor(m / 1e4), rest = m % 1e4;
-  return (oku > 0 ? `${oku}億` : '') + `${rest.toLocaleString('en-US')}万人`;
+  if (oku > 0) return rest === 0 ? `${oku}億人` : `${oku}億${rest.toLocaleString('en-US')}万人`;
+  return `${rest.toLocaleString('en-US')}万人`;
 }
 
 const visibleTooltip = (page) =>
@@ -175,8 +170,8 @@ async function main() {
       await setYear(dp, 1950);
       await sleep(150);
       const bars = await readBars(dp);
-      hw = estimateHalfWidth(bars, xMax);
-      assert(hw > 50 && hw <= 640, `推定 halfWidth が不自然: ${hw}`);
+      hw = await dp.evaluate(() => window.__app.layout.halfWidth);
+      assert(hw > 50 && hw <= 640, `layout.halfWidth が不自然: ${hw}`);
       verifyBars(bars, yearRec(data, 1950), xMax, hw);
     });
 
@@ -350,11 +345,123 @@ async function main() {
     });
     await overlapCheck(dp, '1280px');
 
+    // ---- 追加検査（デスクトップ） ----
+    const hoverRow = async (page, age) => {
+      await page.mouse.move(2, 2);
+      const loc = page.locator(`rect.row-hit[data-age="${age}"]`);
+      await loc.scrollIntoViewIfNeeded();
+      const bb = await loc.boundingBox();
+      assert(bb, `row-hit ${age} の位置を取得できません`);
+      await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+      await page.waitForFunction(() => { const t = document.getElementById('tooltip'); return t && !t.hasAttribute('hidden'); }, null, { timeout: 2000 });
+      const txt = await visibleTooltip(page);
+      assert(txt !== null, '#tooltip が表示されない');
+      return txt;
+    };
+    const needAll = (txt, list) => {
+      const miss = list.filter((x) => !txt.includes(x));
+      assert(miss.length === 0, `欠けている文字列: ${miss.join(' | ')}\n実際: ${txt}`);
+    };
+    await check('5. 1945年30歳（数え年）のツールチップ: 「数え年30歳」「1916年生まれ」', async () => {
+      await setYear(dp, 1945); await sleep(150);
+      needAll(await hoverRow(dp, 30), ['数え年30歳', '1916年生まれ']);
+    });
+    await check('5. 1950年85歳（上位区分）のツールチップ: 「85歳以上」「1865年9月以前生まれ」', async () => {
+      const oa = yearRec(data, 1950).openAge;
+      assert(oa === 85, `1950年の openAge=${oa}`);
+      await setYear(dp, 1950); await sleep(150);
+      needAll(await hoverRow(dp, oa), [`${oa}歳以上`, `${1950 - oa}年9月以前生まれ`]);
+    });
+    await check('5. null の行の文言（1950年90歳／1945年0歳）', async () => {
+      const oa = yearRec(data, 1950).openAge;
+      await setYear(dp, 1950); await sleep(150);
+      needAll(await hoverRow(dp, 90), [`この年は${oa}歳以上にまとめて表示`]);
+      await setYear(dp, 1945); await sleep(150);
+      needAll(await hoverRow(dp, 0), ['数え年のため0歳はありません']);
+    });
+    await dp.mouse.move(2, 2);
+
+    await check('8. 吹き出しの data-note が noteIds 中の kind=callout と一致（主要年すべて）', async () => {
+      const bad = [];
+      for (const y of KEY_YEARS) {
+        await setYear(dp, y); await sleep(100);
+        const rec = yearRec(data, y);
+        const exp = rec.noteIds.filter((id) => data.notes[id] && data.notes[id].kind === 'callout');
+        const info = await calloutInfo(dp);
+        if (info.count !== 1) { bad.push(`${y}年: 表示中の .callout が ${info.count} 個`); continue; }
+        if (!exp.includes(info.note)) bad.push(`${y}年: data-note=${info.note} 期待=${exp.join(',')}`);
+      }
+      assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check('URL: 停止中に年を変えると ?year= が更新される', async () => {
+      await setYear(dp, 1960);
+      let u = new URL(dp.url());
+      assert(u.searchParams.get('year') === '1960', `url=${dp.url()}`);
+      await setYear(dp, 2010);
+      u = new URL(dp.url());
+      assert(u.searchParams.get('year') === '2010', `url=${dp.url()}`);
+    });
+
+    await check('4. 再生中にスライダーを操作すると再生が止まる', async () => {
+      const p = await openPage(browser, DESKTOP_MOTION, 'play-slider');
+      try {
+        const pg = p.page;
+        await setYear(pg, 1920);
+        await pg.click('#btn-play');
+        await sleep(500);
+        assert((await pg.evaluate(() => window.__app.store.getState().playing)) === true, '再生が始まっていない');
+        await pg.focus('#year-slider');
+        await pg.keyboard.press('ArrowRight');
+        await sleep(100);
+        const y1 = await pg.evaluate(() => document.body.dataset.year);
+        assert((await pg.evaluate(() => window.__app.store.getState().playing)) === false, 'playing が false にならない');
+        assert((await pg.getAttribute('#btn-play', 'aria-label')) === '再生', 'aria-label が「再生」に戻らない');
+        await sleep(900);
+        assert((await pg.evaluate(() => document.body.dataset.year)) === y1, '停止後に年が進んだ');
+      } finally { await p.ctx.close(); }
+    });
+
+    await check('6. 1945年（数え年）は全コホートが hidden', async () => {
+      await setYear(dp, 1945);
+      const all = await dp.evaluate(() => [...document.querySelectorAll('.cohort')].map((e) => ({ id: e.dataset.cohort, hidden: e.hasAttribute('hidden') })));
+      assert(all.length >= 3, `.cohort が ${all.length} 個`);
+      const vis = all.filter((c) => !c.hidden);
+      assert(vis.length === 0, `表示中: ${vis.map((c) => c.id).join(',')}`);
+    });
+
+    await check('fixture の帯: ?fixture=1 のときだけ #fixture-banner が表示される', async () => {
+      const shown = (pg) => pg.evaluate(() => {
+        const b = document.getElementById('fixture-banner');
+        return !!b && !b.hasAttribute('hidden') && getComputedStyle(b).display !== 'none' && b.getBoundingClientRect().height > 0;
+      });
+      const f = await browser.newContext(DESKTOP); const fp = await f.newPage();
+      try {
+        await fp.goto(`${args.base}/?fixture=1`, { waitUntil: 'load' });
+        await fp.waitForSelector('body[data-ready="true"]', { timeout: 20000 });
+        assert(await shown(fp), '?fixture=1 で帯が表示されない');
+      } finally { await f.close(); }
+      const n = await browser.newContext(DESKTOP); const np = await n.newPage();
+      try {
+        await np.goto(`${args.base}/`, { waitUntil: 'load' });
+        // data/pyramid.json が未生成なら本番データを読めない。その場合は帯が出ないことだけ確認する。
+        const prodOk = (await np.request.get(`${args.base}/data/pyramid.json`)).ok();
+        if (prodOk) {
+          await np.waitForSelector('body[data-ready="true"]', { timeout: 20000 });
+          const isFx = await np.evaluate(() => window.__app.data.fixture);
+          assert(isFx === false, `fixture パラメータ無しで fixture データを読んだ（data.fixture=${isFx}）`);
+        } else {
+          await sleep(1000);
+        }
+        assert(!(await shown(np)), 'fixture パラメータ無しで帯が表示されている');
+      } finally { await n.close(); }
+    });
+
     // ---- 10. reducedMotion ----
     await check('10. reducedMotion: 年変更50ms後に最終の幅になっている', async () => {
       await setYear(dp, 2000);
       await sleep(300);
-      const settled = estimateHalfWidth(await readBars(dp), xMax);
+      const settled = await dp.evaluate(() => window.__app.layout.halfWidth);
       await dp.evaluate(() => window.__app.store.setYear(1950, {}));
       await sleep(50);
       verifyBars(await readBars(dp), yearRec(data, 1950), xMax, settled);
@@ -411,6 +518,22 @@ async function main() {
         for (const b of r.btns) if (b.w <= 0 || b.l < 0 || b.r > r.iw) bad.push(`${y}年: #${b.id} が画面外 (left=${b.l}, right=${b.r})`);
       }
       assert(bad.length === 0, bad.join('\n'));
+    });
+    await check('9. 375px: SVG 内の text の実寸が10px以上', async () => {
+      const bad = await mp.evaluate(() => {
+        const out = [];
+        for (const t of document.querySelectorAll('svg text')) {
+          const cs = getComputedStyle(t);
+          if (cs.display === 'none' || cs.visibility === 'hidden' || !(t.textContent || '').trim()) continue;
+          if (t.closest('[hidden]')) continue;
+          const m = t.getScreenCTM();
+          const scale = m ? Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) : 1;
+          const px = parseFloat(cs.fontSize) * scale;
+          if (px < 10 - 0.01) out.push(`"${t.textContent.trim().slice(0, 12)}" ${px.toFixed(2)}px`);
+        }
+        return out;
+      });
+      assert(bad.length === 0, `10px 未満: ${bad.slice(0, 8).join(', ')}`);
     });
     await overlapCheck(mp, '375px');
     await m.ctx.close();
