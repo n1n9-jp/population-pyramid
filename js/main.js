@@ -47,6 +47,10 @@ async function main() {
   chart.showYear(store.getState().year, { animate: false });
   store.subscribe((_s, c) => { if (c.type === "year") chart.showYear(store.getState().year); });
 
+  // 読み出しと操作部が配置されてから、1画面に収まる行の高さに合わせる
+  chart.refit();
+  document.fonts?.ready.then(() => chart.refit());
+
   window.__app = { store, data, layout: chart.layout };
   document.body.dataset.year = String(store.getState().year);
   document.body.dataset.ready = "true";

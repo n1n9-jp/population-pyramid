@@ -64,6 +64,17 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
   }
 
   // --- レイアウト ---
+  // 図の下端から、再生ボタンとスライダーの下端までの距離
+  function controlsExtent() {
+    const bottom = svgEl.getBoundingClientRect().bottom;
+    let ext = 0;
+    for (const id of ["btn-play", "year-slider"]) {
+      const el = document.getElementById(id);
+      if (el) ext = Math.max(ext, el.getBoundingClientRect().bottom - bottom);
+    }
+    return ext || 60;
+  }
+
   function computeLayout() {
     const avail = Math.min(MAX_WIDTH, wrap.clientWidth || MAX_WIDTH);
     const narrow = avail < NARROW_BREAKPOINT;
@@ -74,7 +85,13 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
     layout.margin.right = narrow ? 46 : 100;
     layout.margin.top = 30;
     layout.margin.bottom = 46;
-    layout.rowHeight = narrow ? 4.6 : 5.6;
+    const fixedH = layout.margin.top + layout.margin.bottom;
+    const maxRow = narrow ? 4.6 : 5.6, minRow = narrow ? 3 : 3.6;
+    // 図と操作部が初期表示の1画面に収まる行の高さ（余白・操作部の高さは実測）
+    const svgTop = svgEl.getBoundingClientRect().top + window.scrollY;
+    const chartBottomToControls = controlsExtent();
+    const room = window.innerHeight - svgTop - fixedH - chartBottomToControls - 2;
+    layout.rowHeight = Math.max(minRow, Math.min(maxRow, Math.floor((room / NB) * 100) / 100));
     layout.halfWidth = (avail - layout.margin.left - layout.margin.right - layout.ageWidth) / 2;
     layout.xMale = layout.margin.left + layout.halfWidth;
     layout.xFemale = layout.xMale + layout.ageWidth;
@@ -197,7 +214,8 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
     const x = layout.xFemale + layout.halfWidth + 6;
     const mid = (c.top + c.bottom) / 2;
     const k = 4;
-    c.path.setAttribute("d", `M${x},${c.top + 0.5} h${k} V${c.bottom - 0.5} h${-k}`);
+    const h = Math.max(c.bottom - c.top - 1, 8); // 1歳分でも括弧が潰れないよう最低8px
+    c.path.setAttribute("d", `M${x},${mid - h / 2} h${k} V${mid + h / 2} h${-k}`);
     c.text.setAttribute("x", x + k + 4);
     c.text.setAttribute("y", mid);
   }
@@ -323,10 +341,18 @@ export function createChart({ svg: svgEl, wrap, calloutHost, data, store }) {
     const w = Math.min(MAX_WIDTH, wrap.clientWidth || MAX_WIDTH);
     if (w !== layout.width) relayout();
   }).observe(wrap);
+  // 画面の高さや上部の表示が変わったとき、行の高さだけを測り直す
+  function refit() {
+    const before = layout.rowHeight;
+    computeLayout();
+    if (layout.rowHeight !== before) relayout();
+  }
+  window.addEventListener("resize", refit);
 
   return {
     layout,
     hover,
+    refit,
     showYear(year, { animate = true } = {}) {
       const st = store.getState();
       const duration = st.reducedMotion ? 0 : st.playing ? ANIM.playBarMs : ANIM.barMs;

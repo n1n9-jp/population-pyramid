@@ -165,12 +165,14 @@ export function createTooltip({ data, store, chart, wrap }) {
 export function createControls({ store }) {
   const play = $("btn-play");
   const rewind = $("btn-rewind");
+  const yearEl = $("year-display");
   const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
   const ICON_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
   function render() {
     const p = store.getState().playing;
     play.setAttribute("aria-label", p ? "一時停止" : "再生");
     play.innerHTML = p ? ICON_PAUSE : ICON_PLAY;
+    yearEl.setAttribute("aria-live", p ? "off" : "polite");
   }
   play.addEventListener("click", () => (store.getState().playing ? store.pause() : store.play()));
   rewind.addEventListener("click", () => {

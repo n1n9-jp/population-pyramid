@@ -63,7 +63,17 @@ export function createTimeline({ root, svgEl, slider, data, store }) {
   let lastRaw = store.getState().year; // 直前のスライダー生値（gap解決前）
   let inInput = false;
   // キー操作は現在値（解決後）からの±1なので、基準も現在値に合わせる
-  slider.addEventListener("keydown", () => { lastRaw = store.getState().year; });
+  slider.addEventListener("keydown", (e) => {
+    lastRaw = store.getState().year;
+    if (e.key === "PageUp" || e.key === "PageDown") {
+      // 既定の移動量は範囲の10%（約10.5年）なので、±10年に置き換える
+      e.preventDefault();
+      const dir = e.key === "PageUp" ? 1 : -1;
+      store.pause();
+      store.setYear(store.getState().year + dir * 10, { direction: dir });
+      sync();
+    }
+  });
   slider.addEventListener("input", () => {
     store.pause();
     const v = Number(slider.value);

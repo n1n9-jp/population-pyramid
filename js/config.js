@@ -2,8 +2,8 @@ export const COLORS = {
   bg: "#ffffff",
   male: "#9db9d9",
   female: "#ffc56e",
-  maleStrong: "#567eae",
-  femaleStrong: "#a86f17",
+  maleStrong: "#3e6593",
+  femaleStrong: "#8a5a12",
   grid: "#ddd3bd",
   muted: "#5b5346",
 };
