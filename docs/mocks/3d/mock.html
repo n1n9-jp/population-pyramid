@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人口ピラミッド 3D 静止画モック</title>
+<!--
+  3Dページの見た目確認用モック（本実装ではありません）。
+  使い方: リポジトリのルートで `python3 -m http.server 8000` を起動し、
+    http://localhost:8000/docs/mocks/3d/mock.html?view=terrain-overview
+  view = terrain-overview | terrain-dankai | terrain-war | terrain-cut-2025
+       | pyramid-oblique | pyramid-front | color-height | mobile
+  画像の書き出しは同じフォルダの shoot.js（Playwright）。
+-->
+<style>
+  :root{
+    --male:#9db9d9; --female:#ffc56e; --male-strong:#3e6593; --female-strong:#8a5a12;
+    --ink:#222; --sub:#555; --line:#ddd;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#fff;color:var(--ink);
+    font-family:"Hiragino Sans","Noto Sans CJK JP","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;overflow:hidden}
+  #stage{position:fixed;inset:0}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #ov{position:absolute;inset:0;pointer-events:none}
+  #ov svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .lbl{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font-size:11px;color:#666;line-height:1.2}
+  .lbl.ax{font-size:12px;font-weight:700;color:#333}
+  .lbl.cutlbl{font-size:12px;font-weight:700;color:#445}
+  .lbl.tick{font-size:10.5px;color:#777}
+  .lbl.m{color:var(--male-strong);font-weight:700}
+  .lbl.f{color:var(--female-strong);font-weight:700}
+  .call{position:absolute;transform:translate(-50%,-50%);font-size:12px;line-height:1.35;padding:4px 8px;
+    background:rgba(255,255,255,.93);border:1px solid #bbb;border-radius:4px;white-space:nowrap;color:#222}
+  .call b{font-weight:700}
+  .call.m{border-color:var(--male-strong);color:var(--male-strong)}
+  .call.f{border-color:var(--female-strong);color:var(--female-strong)}
+  .call.n{border-color:#999;color:#444}
+  .card{position:absolute;left:24px;top:20px;width:400px;background:rgba(255,255,255,.94);
+    border:1px solid var(--line);border-radius:8px;padding:12px 16px 12px}
+  .card .no{font-size:11px;color:#888;letter-spacing:.04em}
+  .card h1{font-size:19px;margin:2px 0 6px;line-height:1.3}
+  .card p{font-size:12.5px;line-height:1.65;margin:0;color:#333}
+  .tag{position:absolute;right:24px;top:20px;font-size:11px;color:#777;border:1px dashed #aaa;border-radius:4px;padding:3px 8px;background:#fff}
+  .legend{position:absolute;left:24px;bottom:20px;font-size:12px;line-height:1.9;background:rgba(255,255,255,.94);
+    border:1px solid var(--line);border-radius:8px;padding:8px 14px}
+  .legend .row{display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .sw{display:inline-block;width:22px;height:11px;border-radius:2px}
+  .ln{display:inline-block;width:22px;height:0;border-top:3px solid}
+  .ln.thin{border-top-width:1px;opacity:.6}
+  .ln.dash{border-top-style:dashed}
+  .foot{position:absolute;right:24px;bottom:12px;font-size:10px;color:#888;text-align:right;max-width:520px}
+  .ramp{width:150px;height:11px;border-radius:2px;border:1px solid #ccc}
+  /* mobile */
+  body.mobile #stage{position:absolute;left:0;top:0;width:375px;height:420px}
+  body.mobile .card,body.mobile .legend,body.mobile .foot,body.mobile .tag{display:none}
+  body.mobile .opt{display:none}
+  body.mobile .call{font-size:10.5px;padding:2px 6px}
+  body.mobile .lbl{font-size:9.5px}
+  body.mobile .lbl.ax{font-size:10.5px}
+  #sheet{display:none}
+  body.mobile #sheet{display:flex;flex-direction:column;position:absolute;left:0;top:420px;width:375px;height:392px;
+    border-top:1px solid #ccc;background:#fff;box-shadow:0 -4px 10px rgba(0,0,0,.06)}
+  #sheet .hd{padding:8px 16px 6px;border-bottom:1px solid #eee}
+  #sheet .hd .no{font-size:10px;color:#888}
+  #sheet .hd h1{font-size:15px;margin:1px 0 0}
+  #sheet .body{flex:1;overflow:hidden;padding:10px 16px;position:relative}
+  #sheet .body p{font-size:12.5px;line-height:1.7;margin:0 0 9px;color:#333}
+  #sheet .body h2{font-size:13px;margin:12px 0 4px}
+  #sheet .body .key{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:9px;
+    font-size:11px;color:#fff;background:#3e6593;margin-right:6px;font-weight:700}
+  #sheet .body .key.f{background:#8a5a12}
+  #sheet .fade{position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(rgba(255,255,255,0),#fff)}
+  #sheet .hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:11px;color:#777}
+  #sheet .bar{position:absolute;right:3px;top:10px;width:3px;height:90px;border-radius:2px;background:#bbb}
+  #sheet .rail{position:absolute;right:3px;top:10px;bottom:10px;width:3px;border-radius:2px;background:#eee}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="ov"><svg id="lines"></svg></div>
+</div>
+<div class="card" id="card"><div class="no"></div><h1></h1><p></p></div>
+<div class="tag">静止画モック（見た目の確認用・本実装ではありません）</div>
+<div class="legend" id="legend"></div>
+<div class="foot" id="foot"></div>
+<div id="sheet">
+  <div class="hd"><div class="no">静止画モック（見た目の確認用）</div><h1>人口の山脈を、年と年齢で眺める</h1></div>
+  <div class="body">
+    <div class="rail"></div><div class="bar"></div>
+    <p>横が年（1920→2025）、奥行きが年齢（0→100歳）、高さが人数です。手前の面が男性、奥の面が女性で、100歳の側を境に鏡写しに置いています。</p>
+    <p>山脈の表面を斜めに走る線は、同じ年に生まれた世代の軌跡です（年−年齢＝一定）。年が進むほど、世代は1歳ずつ年を重ねます。</p>
+    <h2>強調している世代</h2>
+    <p><span class="key">①</span>団塊の世代（1947〜49年生まれ）。出生数が最も多い世代で、2025年には76〜78歳です。</p>
+    <p><span class="key">②</span>丙午（1966年生まれ）。出生数が前後より大きく減っています。</p>
+    <p><span class="key">③</span>団塊ジュニア（1971〜74年生まれ）。第二のふくらみです。</p>
+    <p><span class="key">④</span>終戦前後（1945〜46年生まれ）。出生が大きく減った世代で、点線で描いています。</p>
+    <div class="fade"></div><div class="hint">↓ スクロールして読む</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+
+/* ------------------------------------------------------------------ 定数 */
+const COL = { m:'#9db9d9', f:'#ffc56e', ms:'#3e6593', fs:'#8a5a12' };
+const SEXKEY = { m:'male', f:'female' };
+const VMAX = 1500000;                     // 1 歳・1 性あたりの人数の上限（xMaxPerSex）
+const q = new URLSearchParams(location.search);
+const VIEW = q.get('view') || 'terrain-overview';
+const MOBILE = VIEW === 'mobile';
+if (MOBILE) document.body.classList.add('mobile');
+
+const DATA = await (await fetch('../../../data/pyramid.json')).json();
+const YEARS = DATA.years;
+const BY = new Map(YEARS.map(y => [y.year, y]));
+const yi = new Map(YEARS.map((y, i) => [y.year, i]));
+const consecutive = i => i >= 0 && i + 1 < YEARS.length && YEARS[i + 1].year - YEARS[i].year === 1;
+
+/** その年・性・年齢の値（openAge の段・null は面に含めない） */
+function val(yr, sex, a) {
+  const o = BY.get(yr); if (!o || a < 0 || a > 100 || a >= o.openAge) return null;
+  const v = o[SEXKEY[sex]][a]; return v == null ? null : v;
+}
+const isKazoe = yr => yr >= 1944 && yr <= 1946;
+
+/* ------------------------------------------------------------------ 色ユーティリティ */
+const C = s => new THREE.Color(s);
+const mix = (c, to, t) => c.clone().lerp(to, t);
+const WHITE = C('#ffffff'), BLACK = C('#000000');
+const RAMP = ['#fff6c8','#c7e9b4','#7fcdbb','#41b6c4','#2c7fb8','#253494'].map(C);
+function ramp(t) {
+  t = Math.min(1, Math.max(0, t)) * (RAMP.length - 1);
+  const i = Math.min(RAMP.length - 2, Math.floor(t));
+  return RAMP[i].clone().lerp(RAMP[i + 1], t - i);
+}
+
+/* ------------------------------------------------------------------ 場面（view）の定義 */
+const T = (yr, a, sex) => terrainPt(yr, a, sex);   // 後で定義（巻き上げ）
+const SC = {
+ 'terrain-overview': {
+   no:'01 / 08', title:'地形型：人口の山脈（全体の俯瞰）',
+   desc:'横が年、奥行きが年齢、高さが人数です。手前が男性、奥が女性で、100歳側を境に鏡写しに置きました。山を斜めに横切る線が、同じ年に生まれた世代（コホート）です。',
+   kind:'terrain', cam:{ target:[0,1.2,1.0], dir:[-0.26,0.72,0.64], dist:46, fov:33 },
+   threads:'all', legend:['sex','threads','kazoe','gap'],
+ },
+ 'terrain-dankai': {
+   no:'02 / 08', title:'団塊の世代の尾根をたどる',
+   desc:'1947〜49年生まれの世代は、生まれた年に人数の高い尾根をつくり、そのまま年を重ねて山脈を斜めに進みます。糸を光らせると、1つの世代が75年かけて動く道すじが見えます。',
+   kind:'terrain', cam:{ target:[3.0,1.2,4.0], dir:[-0.42,0.60,0.68], dist:34, fov:33 },
+   threads:'dankai', glow:true, tint:[1947,1949], legend:['sex','threads','kazoe','gap'],
+ },
+ 'terrain-war': {
+   no:'03 / 08', title:'1940年代の谷と、男性の欠け',
+   desc:'男性（手前）と女性（奥）を同じ年で見比べます。1944〜46年の男性は20〜30代が大きく欠け、女性の同じ年代ほどは欠けていません。1941〜43年は推計がなく、面にすき間があります。',
+   kind:'terrain', cam:{ target:[-5.5,1.0,0], dir:[-0.60,0.55,0.58], dist:33, fov:33 },
+   threads:'war', legend:['sex','threads','kazoe','gap'],
+ },
+ 'terrain-cut-2025': {
+   no:'04 / 08', title:'2025年で山脈を切る',
+   desc:'山脈を2025年の位置で切ると、断面は今の2Dピラミッドの片側の輪郭になります。切り口の側面から見ると、男性（手前）と女性（奥）の年齢分布が背中合わせに並びます。',
+   kind:'terrain', cam:{ target:[8.0,2.0,0], dir:[0.80,0.46,0.52], dist:36, fov:33 },
+   threads:'all', cut:true, quiet:true, legend:['sex','threads','kazoe','gap'],
+ },
+ 'pyramid-oblique': {
+   no:'05 / 08', title:'立体ピラミッド型（斜めから）',
+   desc:'縦が年齢、左右が人数（男性が左、女性が右）、奥行きが年です。今の2Dピラミッドを、時間の方向に押し出した形です。壁面を斜めに走る糸が、世代の軌跡です。',
+   kind:'pyramid', cam:{ target:[0,4.8,-1.0], dir:[-0.62,0.34,0.72], dist:44, fov:30 },
+   threads:'all', legend:['sex','threads','kazoe','gap'],
+ },
+ 'pyramid-front': {
+   no:'06 / 08', title:'立体ピラミッド型（正面から）',
+   desc:'正面から見ると、手前にある2025年の断面は、今の2Dピラミッドと同じ形です。色を付けた段は、強調する世代が2025年にいる年齢です。背後の淡い部分は過去の年の厚みです。',
+   kind:'pyramid', cam:{ ortho:true, target:[0,5.0,0], dir:[0,0,1], dist:60, view:12.6 },
+   threads:'none', frontOutline:true, legend:['sex','rows'],
+ },
+ 'color-height': {
+   no:'07 / 08', title:'色の比較：高さに応じた連続色',
+   desc:'01と同じ視点で、男女の色分けをやめ、人数（高さ）に応じた連続色にしました。山の高低は色だけでも読めますが、男女の区別は位置（手前＝男性、奥＝女性）に頼ります。',
+   kind:'terrain', cam:{ target:[0,1.2,1.0], dir:[-0.26,0.72,0.64], dist:46, fov:33 },
+   threads:'none', heightColor:true, legend:['ramp','kazoe','gap'],
+ },
+ 'mobile': {
+   no:'08 / 08', title:'スマートフォン', desc:'', kind:'terrain',
+   cam:{ target:[0,1.2,1.0], dir:[-0.26,0.72,0.64], dist:46, fov:33, fitR:13.5 },
+   threads:'all', legend:[], quiet:true,
+ },
+};
+const CFG = SC[VIEW]; if (!CFG) throw new Error('unknown view ' + VIEW);
+
+/* ------------------------------------------------------------------ three 基本 */
+const cv = document.getElementById('cv');
+const stage = document.getElementById('stage');
+const W = stage.clientWidth, H = stage.clientHeight;
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(window.devicePixelRatio || 1);
+renderer.setSize(W, H, false);
+renderer.setClearColor(0xffffff, 1);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0xcfd3d8, 1.15));
+const sun = new THREE.DirectionalLight(0xffffff, 1.35); sun.position.set(-6, 14, 9); scene.add(sun);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35); fill.position.set(8, 5, -6); scene.add(fill);
+
+let camera;
+{
+  const c = CFG.cam, t = new THREE.Vector3(...c.target), d = new THREE.Vector3(...c.dir).normalize();
+  if (c.ortho) {
+    const asp = W / H, hh = c.view / 2;
+    camera = new THREE.OrthographicCamera(-hh * asp, hh * asp, hh, -hh, 0.1, 400);
+  } else {
+    camera = new THREE.PerspectiveCamera(c.fov, W / H, 0.1, 400);
+  }
+  let dist = c.dist;
+  if (c.fitR) {                             // 縦長画面では、球が収まる距離に置き直す
+    const vf = THREE.MathUtils.degToRad(c.fov) / 2, hf = Math.atan(Math.tan(vf) * W / H);
+    dist = c.fitR / Math.sin(Math.min(vf, hf));
+  }
+  camera.position.copy(t).addScaledVector(d, dist);
+  camera.lookAt(t);
+  camera.updateMatrixWorld(true);
+}
+const lineMats = [];
+function lmat(color, width, opts = {}) {
+  const m = new LineMaterial({ color: new THREE.Color(color).getHex(), linewidth: width, transparent: opts.opacity != null && opts.opacity < 1,
+    opacity: opts.opacity ?? 1, dashed: !!opts.dash, dashSize: opts.dash ?? 1, gapSize: opts.gap ?? 1, depthTest: opts.depthTest ?? true });
+  m.resolution.set(W, H); lineMats.push(m); return m;
+}
+function addLine(pts, mat) {
+  const g = new LineGeometry(); g.setPositions(pts.flatMap(p => [p.x, p.y, p.z]));
+  const l = new Line2(g, mat); l.computeLineDistances(); scene.add(l); return l;
+}
+function addThin(pts, color, opacity = 1) {
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity })); scene.add(l); return l;
+}
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+/* ------------------------------------------------------------------ 地形型 */
+const TX = yr => (yr - 1920) / 5 - 10.5;                  // 年 → x
+const TZ = (sex, a) => (sex === 'm' ? 1 : -1) * (100 - a) * 0.1;   // 年齢 → 奥行き（男性は手前＝+z）
+const TH = v => v / VMAX * 6.5;                          // 人数 → 高さ
+function terrainPt(yr, a, sex, lift = 0) {
+  const v = val(yr, sex, a); if (v == null) return null;
+  return V(TX(yr), TH(v) + lift, TZ(sex, a));
+}
+function vcolor(sex, yr, a, v, notint) {
+  let c;
+  if (CFG.heightColor) c = ramp(v / VMAX);
+  else c = C(sex === 'm' ? COL.m : COL.f);
+  if (CFG.tint && !notint) { const b = yr - a; if (b >= CFG.tint[0] && b <= CFG.tint[1]) c = C(sex === 'm' ? COL.ms : COL.fs); }
+  if (isKazoe(yr)) c = mix(c, WHITE, 0.55);               // 数え年は薄く
+  return c;
+}
+function buildTerrain(sex) {
+  const pos = [], col = [], idx = [], vid = new Map();
+  const id = (i, a) => {
+    const k = i * 128 + a; if (vid.has(k)) return vid.get(k);
+    const y = YEARS[i], v = val(y.year, sex, a); if (v == null) { vid.set(k, -1); return -1; }
+    const p = terrainPt(y.year, a, sex), c = vcolor(sex, y.year, a, v);
+    pos.push(p.x, p.y, p.z); col.push(c.r, c.g, c.b);
+    const n = pos.length / 3 - 1; vid.set(k, n); return n;
+  };
+  for (let i = 0; i + 1 < YEARS.length; i++) {
+    if (!consecutive(i)) continue;                         // 1940→1944 は補間せず空ける
+    for (let a = 0; a < 100; a++) {
+      const A = id(i, a), B = id(i + 1, a), Cc = id(i + 1, a + 1), D = id(i, a + 1);
+      if (A < 0 || B < 0 || Cc < 0 || D < 0) continue;
+      idx.push(A, B, Cc, A, Cc, D);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .92, metalness: 0, side: THREE.DoubleSide }));
+  scene.add(m);
+
+  // 側面（断面の壁）：年の端と、年齢の端
+  const wp = [], wc = [];
+  const quad = (p0, p1, p2, p3, c) => { [p0,p1,p2,p0,p2,p3].forEach(p => { wp.push(p.x, p.y, p.z); wc.push(c.r, c.g, c.b); }); };
+  const wcol = (yr, a, v) => mix(vcolor(sex, yr, a, v, true), BLACK, 0.16);
+  const yearEnds = [];
+  YEARS.forEach((y, i) => { if (i === 0 || !consecutive(i - 1)) yearEnds.push(i); if (i === YEARS.length - 1 || !consecutive(i)) yearEnds.push(i); });
+  for (const i of new Set(yearEnds)) {
+    const y = YEARS[i].year;
+    for (let a = 0; a < 100; a++) {
+      const v0 = val(y, sex, a), v1 = val(y, sex, a + 1); if (v0 == null || v1 == null) continue;
+      const p0 = terrainPt(y, a, sex), p1 = terrainPt(y, a + 1, sex);
+      quad(V(p0.x,0,p0.z), p0, p1, V(p1.x,0,p1.z), wcol(y, a, v0));
+    }
+  }
+  for (let i = 0; i + 1 < YEARS.length; i++) {
+    if (!consecutive(i)) continue;
+    const y0 = YEARS[i].year, y1 = YEARS[i + 1].year;
+    let lo = -1, hi = -1;
+    for (let a = 0; a <= 100; a++) if (val(y0, sex, a) != null && val(y1, sex, a) != null) { if (lo < 0) lo = a; hi = a; }
+    for (const a of (lo === hi ? [lo] : [lo, hi])) {
+      if (a < 0) continue;
+      const p0 = terrainPt(y0, a, sex), p1 = terrainPt(y1, a, sex);
+      quad(V(p0.x,0,p0.z), p0, p1, V(p1.x,0,p1.z), wcol(y0, a, val(y0, sex, a)));
+    }
+  }
+  const wg = new THREE.BufferGeometry();
+  wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3));
+  wg.setAttribute('color', new THREE.Float32BufferAttribute(wc, 3));
+  wg.computeVertexNormals();
+  scene.add(new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95, side: THREE.DoubleSide })));
+
+  // 等高線風の補助線（10年ごと・10歳ごと）
+  const lc = CFG.heightColor ? 0x335577 : 0xffffff, lo2 = CFG.heightColor ? 0.18 : 0.55;
+  for (let yr = 1920; yr <= 2020; yr += 10) {
+    if (!BY.has(yr)) continue;
+    const pts = []; for (let a = 0; a < 100; a++) { const p = terrainPt(yr, a, sex, 0.012); if (p) pts.push(p); }
+    if (pts.length > 1) addThin(pts, lc, lo2);
+  }
+  for (let a = 10; a <= 90; a += 10) {
+    let run = [];
+    YEARS.forEach((y, i) => {
+      const p = terrainPt(y.year, a, sex, 0.012);
+      if (p && (run.length === 0 || consecutive(i - 1))) run.push(p);
+      else { if (run.length > 1) addThin(run, lc, lo2); run = p ? [p] : []; }
+    });
+    if (run.length > 1) addThin(run, lc, lo2);
+  }
+}
+
+/* ------------------------------------------------------------------ 世代の糸 */
+const HI = [
+  { id:'dankai', from:1947, to:1949, name:'団塊の世代' },
+  { id:'hinoe',  from:1966, to:1966, name:'丙午' },
+  { id:'junior', from:1971, to:1974, name:'団塊ジュニア' },
+  { id:'war',    from:1945, to:1946, name:'終戦前後', dash:true },
+];
+const hiOf = b => HI.find(h => b >= h.from && b <= h.to);
+
+/** 出生年 b の糸を、(年−年齢=b) に沿って線分の組にして返す。欠測・すき間で切る */
+function cohortRuns(b, sex, ptFn) {
+  const runs = []; let run = [];
+  YEARS.forEach((y, i) => {
+    const a = y.year - b, p = (a >= 0 && a <= 100) ? ptFn(y.year, a, sex) : null;
+    if (p && (run.length === 0 || consecutive(i - 1))) run.push(p);
+    else { if (run.length > 1) runs.push(run); run = p ? [p] : []; }
+  });
+  if (run.length > 1) runs.push(run);
+  return runs;
+}
+function firstPt(b, sex, ptFn) { const r = cohortRuns(b, sex, ptFn); return r.length ? r[0][0] : null; }
+
+function drawThreads(ptFn, mode) {
+  if (mode === 'none') return;
+  const ws = MOBILE ? 1.0 : 1.0;
+  // 細く淡い糸（5年おき）
+  if (mode === 'all') {
+    for (let b = 1830; b <= 2025; b += 5) {
+      if (hiOf(b)) continue;
+      for (const sex of ['m', 'f'])
+        for (const r of cohortRuns(b, sex, ptFn))
+          addLine(r, lmat(sex === 'm' ? '#34567f' : '#8a5a12', ws, { opacity: 0.30 }));
+    }
+  }
+  const on = mode === 'dankai' ? ['dankai'] : HI.map(h => h.id);
+  for (const h of HI) {
+    if (!on.includes(h.id)) continue;
+    for (let b = h.from; b <= h.to; b++) for (const sex of ['m', 'f']) {
+      const col = sex === 'm' ? COL.ms : COL.fs;
+      const runs = cohortRuns(b, sex, ptFn);
+      for (const r of runs) {
+        if (CFG.glow) { addLine(r, lmat(sex === 'm' ? '#c9dbf0' : '#ffe6b5', 10)); addLine(r, lmat('#ffffff', 5.5)); }
+        addLine(r, lmat(col, CFG.glow ? 3.2 : (MOBILE ? 2.4 : 2.8), h.dash ? { dash: 0.28, gap: 0.2 } : {}));
+      }
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ 立体ピラミッド型 */
+const PX = c => c / VMAX * 6.0;                          // 人数 → 横
+const PY = a => a * 0.1;                                 // 年齢 → 縦
+const PZ = yr => (yr - 1920) / 5 - 10.5;                 // 年 → 奥行き（2025年が手前）
+function pyramidWallPt(yr, a, sex, out = 0.03) {          // 壁面上の点（段の中央の高さ）
+  const v = val(yr, sex, a); if (v == null) return null;
+  return V((sex === 'm' ? -1 : 1) * (PX(v) + out), PY(a + 0.5), PZ(yr));
+}
+function buildPyramid() {
+  const pos = [], col = [];
+  const quad = (p0, p1, p2, p3, c) => { [p0,p1,p2,p0,p2,p3].forEach(p => { pos.push(p.x, p.y, p.z); col.push(c.r, c.g, c.b); }); };
+  const base = (sex, yr) => { let c = C(sex === 'm' ? COL.m : COL.f); if (isKazoe(yr)) c = mix(c, WHITE, .55); return c; };
+  const last = YEARS[YEARS.length - 1].year;
+  for (const sex of ['m', 'f']) {
+    const s = sex === 'm' ? -1 : 1;
+    const X = (yr, a) => { const v = val(yr, sex, a); return v == null ? null : s * PX(v); };
+    for (let i = 0; i < YEARS.length; i++) {
+      const y = YEARS[i].year;
+      // 端の面（手前＝2025年と、すき間の両端）
+      const prev = i > 0 && consecutive(i - 1), next = consecutive(i);
+      for (let a = 0; a <= 100; a++) {
+        const x = X(y, a); if (x == null) continue;
+        const z = PZ(y);
+        let c = base(sex, y);
+        if (y === last && CFG.frontOutline) { const b = y - a; if (hiOf(b)) c = C(sex === 'm' ? COL.ms : COL.fs); }
+        if (!prev) quad(V(0,PY(a),z), V(x,PY(a),z), V(x,PY(a+1),z), V(0,PY(a+1),z), mix(c, BLACK, .10));
+        if (!next) quad(V(0,PY(a),z), V(x,PY(a),z), V(x,PY(a+1),z), V(0,PY(a+1),z), c);
+      }
+      if (!next) continue;
+      const y2 = YEARS[i + 1].year, z0 = PZ(y), z1 = PZ(y2);
+      const cw = mix(base(sex, y), BLACK, 0.04);
+      const ok = a => X(y, a) != null && X(y2, a) != null;
+      const Pc = (yy, zz, a) => V(X(yy, a), PY(a + 0.5), zz);
+      let lo = -1, hi = -1;
+      for (let a = 0; a <= 100; a++) if (ok(a)) { if (lo < 0) lo = a; hi = a; }
+      if (lo < 0) continue;
+      for (let a = lo; a < hi; a++) if (ok(a) && ok(a + 1)) quad(Pc(y, z0, a), Pc(y2, z1, a), Pc(y2, z1, a + 1), Pc(y, z0, a + 1), cw);
+      const tb = mix(base(sex, y), WHITE, .10);
+      quad(V(0,PY(lo),z0), V(0,PY(lo),z1), V(X(y2,lo),PY(lo+0.5),z1), V(X(y,lo),PY(lo+0.5),z0), tb);
+      quad(V(0,PY(hi+1),z0), V(0,PY(hi+1),z1), V(X(y2,hi),PY(hi+0.5),z1), V(X(y,hi),PY(hi+0.5),z0), tb);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .92, side: THREE.DoubleSide })));
+}
+
+/* ------------------------------------------------------------------ ラベル（3D座標 → 画面） */
+const ov = document.getElementById('ov'), svg = document.getElementById('lines');
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+const labels = [];
+function proj(p) { const v = p.clone().project(camera); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * H]; }
+function label(text, p, cls = '', dx = 0, dy = 0) {
+  if (CFG.quiet && /tick|\bax\b/.test(cls)) return;
+  const e = document.createElement('div'); e.className = 'lbl ' + cls; e.innerHTML = text; ov.appendChild(e);
+  labels.push({ e, p, dx, dy }); return e;
+}
+function callout(html, p, dx, dy, cls = 'n', opt = false) {
+  const e = document.createElement('div'); e.className = 'call ' + cls + (opt ? ' opt' : ''); e.innerHTML = html; ov.appendChild(e);
+  const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  ln.setAttribute('stroke', cls === 'm' ? COL.ms : cls === 'f' ? COL.fs : '#777'); ln.setAttribute('stroke-width', '1.2');
+  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); dot.setAttribute('r', '3');
+  dot.setAttribute('fill', '#fff'); dot.setAttribute('stroke', ln.getAttribute('stroke')); dot.setAttribute('stroke-width', '1.5');
+  if (opt && MOBILE) { e.style.display = 'none'; return; }
+  svg.appendChild(ln); svg.appendChild(dot);
+  labels.push({ e, p, dx, dy, ln, dot });
+}
+function placeAll() {
+  for (const L of labels) {
+    const [x, y] = proj(L.p);
+    L.e.style.left = (x + L.dx) + 'px'; L.e.style.top = (y + L.dy) + 'px';
+    if (L.ln) {
+      L.ln.setAttribute('x1', x); L.ln.setAttribute('y1', y);
+      L.ln.setAttribute('x2', x + L.dx); L.ln.setAttribute('y2', y + L.dy);
+      L.dot.setAttribute('cx', x); L.dot.setAttribute('cy', y);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ 地形型：床・軸 */
+function terrainFloorAndAxes() {
+  const zf = 10.0, zb = -10.0, x0 = TX(1920), x1 = TX(2025);
+  // 床の格子
+  for (let yr = 1920; yr <= 2020; yr += 10) addThin([V(TX(yr),0,zb), V(TX(yr),0,zf)], 0xd6d6d6);
+  addThin([V(x1,0,zb), V(x1,0,zf)], 0xd6d6d6);
+  for (const a of [0,20,40,60,80,100]) for (const s of ['m','f']) { const z = TZ(s, a); addThin([V(x0,0,z), V(x1,0,z)], a === 100 ? 0x999999 : 0xdddddd); }
+  // すき間 1941–43 の帯
+  {
+    const g = new THREE.PlaneGeometry(TX(1944) - TX(1940), zf - zb);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xe9e9e9, transparent: true, opacity: .75, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2; m.position.set((TX(1940) + TX(1944)) / 2, 0.005, (zf + zb) / 2); scene.add(m);
+    for (const yr of [1940, 1944]) addThin([V(TX(yr),0.02,zb), V(TX(yr),0.02,zf)], 0xaaaaaa);
+  }
+  // 年の目盛り（手前）
+  for (let yr = 1920; yr <= 2020; yr += 20) label(String(yr), V(TX(yr), 0, zf + 0.9), 'tick');
+  label('2025', V(x1, 0, zf + 0.9), 'tick');
+  label('年 →', V(0, 0, zf + 2.0), 'ax');
+  // 年齢の目盛り（左端）
+  for (const a of [0, 20, 40, 60, 80]) {
+    label(a + '歳', V(x0 - 0.9, 0, TZ('m', a)), 'tick'); label(a + '歳', V(x0 - 0.9, 0, TZ('f', a)), 'tick');
+  }
+  label('100歳', V(x0 - 0.9, 0, 0), 'tick');
+  label('年齢', V(x0 - 2.3, 0, 5.2), 'ax'); label('年齢', V(x0 - 2.3, 0, -5.2), 'ax');
+  // 人数（高さ）の目盛り：手前右の角
+  addThin([V(x1, 0, zf), V(x1, TH(1500000), zf)], 0x999999);
+  for (const v of [0, 500000, 1000000, 1500000]) { addThin([V(x1,TH(v),zf), V(x1+0.25,TH(v),zf)], 0x999999); label(v ? (v / 10000) + '万人' : '0', V(x1 + 1.3, TH(v), zf), 'tick'); }
+  label('人数（各歳）', V(x1 + 1.3, TH(1500000) + 0.9, zf), 'ax');
+  // 男女
+  label('◀ 男性の面', V(x0 + 0.8, 0.1, 7.2), 'm');
+  label('◀ 女性の面', V(x0 + 0.8, 0.1, -7.2), 'f');
+}
+
+/* ------------------------------------------------------------------ 構築 */
+function legendHtml() {
+  const L = CFG.legend, r = [];
+  const row = (sw, t) => r.push(`<div class="row">${sw}<span>${t}</span></div>`);
+  if (L.includes('sex')) { row(`<i class="sw" style="background:${COL.m}"></i>`, '男性'); row(`<i class="sw" style="background:${COL.f}"></i>`, '女性'); }
+  if (L.includes('threads')) {
+    row(`<i class="ln" style="border-color:${COL.ms}"></i><i class="ln" style="border-color:${COL.fs};margin-left:-4px"></i>`, '強調する世代の糸（男性／女性）');
+    row(`<i class="ln dash" style="border-color:${COL.ms}"></i>`, '終戦前後（1945〜46年生まれ）');
+    row(`<i class="ln thin" style="border-color:#34567f"></i>`, 'そのほかの世代（5年おき）');
+  }
+  if (L.includes('rows')) row(`<i class="sw" style="background:linear-gradient(90deg,${COL.ms},${COL.fs})"></i>`, '強調する世代がいる年齢');
+  if (L.includes('ramp')) {
+    row(`<i class="ramp" style="background:linear-gradient(90deg,${RAMP.map(c => '#' + c.getHexString()).join(',')})"></i>`, '0 → 150万人（各歳）');
+  }
+  if (L.includes('kazoe')) row(`<i class="sw" style="background:linear-gradient(90deg,#d5e2ef,#ffe9c4)"></i>`, '数え年の年（1944〜46）は淡色');
+  if (L.includes('gap')) row(`<i class="sw" style="background:#e9e9e9;border:1px dashed #aaa"></i>`, '推計なし（1941〜43）：補間しない');
+  document.getElementById('legend').innerHTML = r.join('');
+}
+
+function setupChrome() {
+  const card = document.getElementById('card');
+  card.querySelector('.no').textContent = CFG.no;
+  card.querySelector('h1').textContent = CFG.title;
+  card.querySelector('p').textContent = CFG.desc;
+  legendHtml();
+  document.getElementById('foot').innerHTML = (DATA.attribution || '') + '<br>1944〜46年は数え年。上位の一括区分（85歳以上など）は面に含めていません。';
+}
+
+if (CFG.kind === 'terrain') {
+  buildTerrain('m'); buildTerrain('f');
+  terrainFloorAndAxes();
+  drawThreads((yr, a, sex) => terrainPt(yr, a, sex, 0.07), CFG.threads);
+} else {
+  buildPyramid();
+}
+
+/* ---- 場面ごとの注記 ---- */
+const P = (b, sex) => firstPt(b, sex, terrainPt);
+if (VIEW === 'terrain-overview' || VIEW === 'mobile') {
+  const mb = MOBILE;
+  const t = (n, s) => mb ? n : s;
+  callout(t('①', '<b>団塊の世代</b><br>1947〜49年生まれ'), terrainPt(1957, 9, 'm'), mb ? -26 : -150, mb ? 28 : 60, 'm');
+  callout(t('②', '<b>丙午</b> 1966年生まれ'), terrainPt(1976, 10, 'm'), mb ? 18 : 40, mb ? 40 : 92, 'm');
+  callout(t('③', '<b>団塊ジュニア</b><br>1971〜74年生まれ'), terrainPt(1988, 15, 'm'), mb ? 52 : 100, mb ? 22 : 78, 'm');
+  callout(t('④', '<b>終戦前後の出生減</b><br>1945〜46年生まれ'), terrainPt(1951, 5, 'm'), mb ? -52 : -112, mb ? 62 : 118, 'm');
+}
+if (VIEW === 'terrain-dankai') {
+  callout('<b>1950年 1〜3歳</b><br>団塊の世代（1947〜49年生まれ）', terrainPt(1950, 2, 'm'), 150, 70, 'm');
+  callout('<b>1980年 31〜33歳</b>', terrainPt(1980, 32, 'm'), -78, 66, 'm');
+  callout('<b>2025年 76〜78歳</b><br>いまの後期高齢者のふくらみ', terrainPt(2025, 77, 'm'), -20, 80, 'm');
+  callout('女性の団塊の世代も同じ軌跡をたどる', terrainPt(2000, 52, 'f'), 8, -56, 'f');
+  label('1947→2025：78年で 0歳 → 76〜78歳', V(TX(1988), 0, 10.8), 'ax');
+}
+if (VIEW === 'terrain-war') {
+  callout('<b>1941〜43年：推計なし</b><br>面を補間せず、すき間にしています', V(TX(1942), 0, 0.4), 10, -118, 'n');
+  callout('<b>男性 20〜30代の欠け</b><br>1944〜46年（25歳で24〜38万人）', terrainPt(1945, 26, 'm'), -190, -58, 'm');
+  callout('女性の同年代は<br>56〜66万人（25歳）', terrainPt(1945, 26, 'f'), 90, -62, 'f');
+  callout('<b>1945〜46年生まれの谷</b><br>出生減の世代（点線）', terrainPt(1950, 3, 'm'), 30, 112, 'm');
+  callout('1940年の男性の少なさには、外地の軍人を<br>含まない集計の影響が混じります', terrainPt(1940, 28, 'm'), -158, 40, 'n');
+  label('1944〜46は数え年（淡色）', V(TX(1945), 0, 10.9), 'tick');
+}
+if (VIEW === 'terrain-cut-2025') {
+  /* 切り離した断面（スラブ）と、切断面の枠 */
+  const x25 = TX(2025), off = 1.7, th = 0.28;
+  const mk = sex => {
+    const s = new THREE.Shape(); const sg = sex === 'm' ? 1 : -1;
+    s.moveTo(0, 0);
+    for (let a = 99; a >= 0; a--) { const v = val(2025, sex, a); const u = (100 - a) * 0.1 * sg; s.lineTo(u, TH(v)); if (a === 99) {} }
+    s.lineTo((sex === 'm' ? 1 : -1) * 10.0, 0); s.lineTo(0, 0);
+    const g = new THREE.ExtrudeGeometry(s, { depth: th, bevelEnabled: false });
+    g.rotateY(-Math.PI / 2); g.translate(x25 + off + th, 0, 0);
+    scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: sex === 'm' ? COL.m : COL.f, roughness: .85 })));
+    // 輪郭を強調
+    const pts = []; for (let a = 99; a >= 0; a--) pts.push(V(x25 + off + th + 0.01, TH(val(2025, sex, a)), (100 - a) * 0.1 * sg));
+    addLine(pts, lmat(sex === 'm' ? COL.ms : COL.fs, 3.2));
+  };
+  mk('m'); mk('f');
+  // 強調する世代の位置を断面に点で示す
+  for (const h of HI) for (let b = h.from; b <= h.to; b++) for (const sex of ['m', 'f']) {
+    const a = 2025 - b, v = val(2025, sex, a); if (v == null) continue;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), new THREE.MeshBasicMaterial({ color: sex === 'm' ? COL.ms : COL.fs }));
+    m.position.set(x25 + off + th + 0.02, TH(v), TZ(sex, a)); scene.add(m);
+  }
+  // 切断面の枠（半透明）
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(20, 6.4), new THREE.MeshBasicMaterial({ color: 0x5c6f86, transparent: true, opacity: .07, side: THREE.DoubleSide, depthWrite: false }));
+  plane.rotation.y = Math.PI / 2; plane.position.set(x25 + 0.03, 3.2, 0); scene.add(plane);
+  addLine([V(x25+.03,0,-10), V(x25+.03,6.4,-10), V(x25+.03,6.4,10), V(x25+.03,0,10), V(x25+.03,0,-10)], lmat('#5c6f86', 1.6, { dash: .25, gap: .15 }));
+  // 引き出した位置を示す点線
+  for (const z of [-10, 10]) addLine([V(x25, 0.02, z), V(x25 + off, 0.02, z)], lmat('#999', 1, { dash: .2, gap: .15 }));
+  callout('<b>2025年の断面</b><br>切り口の輪郭が、2Dピラミッドの片側', V(x25 + off + th, TH(1000000), 3.1), 30, -110, 'n');
+  callout('男性（手前）', V(x25 + off + th, TH(200000), 7.0), 20, 42, 'm');
+  callout('女性（奥）', V(x25 + off + th, TH(200000), -7.0), 20, -34, 'f');
+  callout('76〜78歳：団塊の世代', V(x25 + off + th, TH(val(2025,'m',77)), TZ('m', 77)), 60, 56, 'm');
+  label('切る位置：2025年', V(x25 + 0.3, 7.4, 0), 'cutlbl');
+}
+if (VIEW === 'pyramid-oblique' || VIEW === 'pyramid-front') {
+  const zf = PZ(2025), z0 = PZ(1920);
+  // 床の格子
+  for (let yr = 1920; yr <= 2020; yr += 20) addThin([V(-6,0,PZ(yr)), V(6,0,PZ(yr))], 0xdddddd);
+  addThin([V(0,0,z0), V(0,0,zf)], 0xbbbbbb);
+  // 2D ピラミッドと同じ座標の目盛り（前面）
+  const gz = zf + 0.02;
+  for (const a of [0,20,40,60,80,100]) addThin([V(-6,PY(a),gz), V(6,PY(a),gz)], 0x777777, a === 0 ? 0.9 : 0.35);
+  for (const v of [-1500000,-1000000,-500000,0,500000,1000000,1500000]) addThin([V(v/VMAX*6,0,gz), V(v/VMAX*6,PY(100),gz)], 0x777777, v === 0 ? 0.55 : 0.2);
+  for (const a of [0,20,40,60,80,100]) label(a + '歳', V(-6.9, PY(a), zf), 'tick');
+  for (const v of [-1500000,-1000000,-500000,0,500000,1000000,1500000]) label(v === 0 ? '0' : (Math.abs(v) / 10000) + '万', V(v/VMAX*6, -0.55, zf), 'tick');
+  label('人数（各歳）', V(0, -1.3, zf), 'ax');
+  label('年齢', V(-7.9, 5.0, zf), 'ax');
+  label('◀ 男性', V(-3.6, 10.8, zf), 'm'); label('女性 ▶', V(3.6, 10.8, zf), 'f');
+  if (VIEW === 'pyramid-oblique') {
+    for (const yr of [1920, 1950, 1980, 2025]) label(String(yr), V(-7.2, 0, PZ(yr)), 'tick');
+    label('年（奥ほど過去）', V(-8.6, 0, (z0 + zf) / 2 - 2), 'ax');
+    // 世代の糸
+    drawThreads((yr, a, sex) => pyramidWallPt(yr, a, sex), 'all');
+    callout('<b>2025年の断面</b><br>正面から見ると2Dピラミッド', V(-2.2, PY(55), zf), -150, 70, 'n');
+    callout('<b>団塊の世代</b>の糸', pyramidWallPt(1985, 37, 'm', 0.06), -86, -70, 'm');
+    callout('<b>団塊ジュニア</b>の糸', pyramidWallPt(1998, 25, 'm', 0.06), -120, 70, 'm');
+    callout('<b>1941〜43年</b>：推計なし（すき間）', V(-3.0, PY(30), PZ(1942)), -112, -64, 'n');
+  } else {
+    // 2025 年の輪郭を強調
+    for (const sex of ['m', 'f']) {
+      const s = sex === 'm' ? -1 : 1, pts = [V(0, 0, gz)];
+      for (let a = 0; a <= 99; a++) { const v = val(2025, sex, a); pts.push(V(s * PX(v), PY(a), gz + 0.02), V(s * PX(v), PY(a + 1), gz + 0.02)); }
+      pts.push(V(0, PY(100), gz + 0.02)); addLine(pts, lmat('#333', 1.6));
+    }
+    callout('<b>団塊の世代</b><br>76〜78歳', V(PX(val(2025,'m',77)) * -1, PY(77.5), gz), -96, -16, 'm');
+    callout('<b>丙午</b> 59歳', V(-PX(val(2025,'m',59)), PY(59.5), gz), -120, 20, 'm');
+    callout('<b>団塊ジュニア</b><br>51〜54歳', V(PX(val(2025,'f',52)), PY(52.5), gz), 100, 12, 'f');
+    callout('<b>終戦前後</b> 79〜80歳', V(PX(val(2025,'f',79.5|0)), PY(79.5), gz), 110, -40, 'f');
+    callout('淡い部分は過去の年の厚み<br>（昔の若い世代ほど、はみ出す）', V(-PX(1250000), PY(3), gz - 4), -34, 46, 'n');
+    label('2025年の断面（今の2Dピラミッドと同じ形）', V(0, PY(100) + 1.6, gz), 'ax');
+  }
+}
+
+setupChrome();
+renderer.render(scene, camera);
+placeAll();
+renderer.render(scene, camera);
+window.__ready = true;
+</script>
+</body>
+</html>

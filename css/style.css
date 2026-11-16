@@ -155,4 +155,4 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
 
 /* ページ間リンク */
 .page-nav { margin: 0 0 6px; font-size: 14px; }
-.page-nav a { color: var(--male-strong); }
+.page-nav a { color: var(--male-strong); white-space: nowrap; }

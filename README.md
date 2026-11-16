@@ -77,12 +77,34 @@ node tests/e2e/regions.cjs --base http://localhost:8000
 
 `data/regions.json`、`data/regions_by_age.csv`、`data/regions_build_report.json` が生成されます。終了コードは 0=合格、1=検証FAIL、2=取得失敗です。`build_data.py` と `build_regions.py` は `data/sources.lock.json` を共有し、互いのキーを消しません。
 
+## 3Dページ（mountain.html）
+
+全国の各歳別人口を、年・年齢・人数の3軸の「山脈」として立体で見せます。<http://localhost:8000/mountain.html> で開きます（`?step=free` のように段を指定して開けます。`?fixture=1` はサンプルデータ、`?stub=1` は3D描画を使わない仮実装）。仕様は [docs/MOUNTAIN.md](docs/MOUNTAIN.md) にあります。
+
+**見方**：横が年（1920→2025）、奥行きが年齢（0→100歳）、高さが人数です。手前の面が男性、奥の面が女性で、100歳の側を境に鏡写しに置いています。山を斜めに走る細い線は「コホートの糸」で、同じ年に生まれた世代が年ごとに1歳ずつ年齢を重ねる軌跡です。強調の色は男性が青、女性が茶色で、終戦前後（1945〜46年生まれ）は破線です。1941〜43年は推計がないため面にすき間があり、1944〜46年は数え年なので淡く描きます。各年のいちばん上の段（85歳以上など）は面に含めません。
+
+**操作**：右の解説をスクロールすると、見る場所が7段階で切り替わります。最後の「自分で動かして確かめる」では、ドラッグで回転、ホイールやピンチで拡大・縮小、地形型と立体ピラミッド型の切り替え、断面の年のスライダー（推計のない年は動かす向きに飛ばします）、強調する世代の選択ができます。山や糸にカーソルを合わせる（スマートフォンではタップする）と、その地点の世代・年・年齢・人数が出ます。断面の年の人数は、2Dの小窓と「データを表で見る」でも読めます。動きを減らす設定（reduced motion）のときは、変形やカメラの移動をせず、各段の最終の状態をそのまま表示します。
+
+**WebGL が使えないとき**：3D表示の代わりに静止画（`assets/mountain-fallback.png`）と案内文を出します。解説文・データ表・全国ページと地域別ページへのリンクは、そのまま使えます。
+
+**E2E**（chromium は swiftshader で動かすため、WebGL のない環境でも実行できます）：
+
+```sh
+python3 -m http.server 8000 &
+node tests/e2e/mountain.cjs --base http://localhost:8000            # 本番の scene.js・実データ
+node tests/e2e/mountain.cjs --base http://localhost:8000 --fixture  # サンプルデータ
+node tests/e2e/mountain.cjs --base http://localhost:8000 --stub     # 仮実装（3D描画なし）
+node tests/e2e/mountain.cjs --base http://localhost:8000 --out docs/screenshots   # 各段のスクリーンショットも保存
+```
+
 ## ファイル構成
 
 ```
 index.html            ページ本体（解説文は #about）
 css/style.css         スタイル
 js/                   フロントエンド（ES modules）
+js/mountain/          3Dページ（scene.js が three.js の描画）
+mountain.html         3Dページ本体
 data/                 生成データ（pyramid.json, CSV, build_report.json, sources.lock.json）
 data/schema/          pyramid.json のスキーマ
 scripts/              データ構築（build_data.py と pyramid_data/）
