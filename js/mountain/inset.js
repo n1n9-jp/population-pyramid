@@ -36,10 +36,6 @@ export function createInset({ root, data }) {
       }
     }
     svg.append(el("line", { x1: CX, x2: CX, y1: TOP, y2: TOP + ROW * 101, class: "baseline" }));
-    for (const age of [0, 20, 40, 60, 80, 100]) {
-      const yy = TOP + ROW * (100 - age) + ROW / 2;
-      svg.append(el("text", { x: CX, y: yy + 3, "text-anchor": "middle", class: "inset-age" }, String(age)));
-    }
     const bars = el("g", { class: "inset-bars" });
     for (const sex of ["male", "female"]) {
       const arr = y[sex];
@@ -60,6 +56,11 @@ export function createInset({ root, data }) {
       }
     }
     svg.append(bars);
+    // 年齢の目盛りは棒より後に置き、隠れないようにする
+    for (const age of [0, 20, 40, 60, 80, 100]) {
+      const yy = TOP + ROW * (100 - age) + ROW / 2;
+      svg.append(el("text", { x: CX, y: yy + 3, "text-anchor": "middle", class: "inset-age" }, String(age)));
+    }
     svg.append(el("text", { x: CX - HALF, y: H - 6, class: "inset-axis" }, `${xMax / 10000}万人`));
     svg.append(el("text", { x: CX + HALF, y: H - 6, "text-anchor": "end", class: "inset-axis" }, `${xMax / 10000}万人`));
     svg.append(el("text", { x: CX, y: H - 6, "text-anchor": "middle", class: "inset-axis" }, "0"));

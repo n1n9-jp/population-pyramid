@@ -35,6 +35,8 @@ export function createTour({ scene, free, reducedMotion }) {
   function setOrbit(on) {
     if (orbit === on) return;
     orbit = on;
+    const canvas = document.getElementById("mountain-canvas");
+    if (canvas) canvas.dataset.free = String(on);
     scene.setOrbit(on);
   }
 

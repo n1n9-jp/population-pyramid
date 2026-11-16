@@ -1,7 +1,7 @@
 import { DATA_PATH, FIXTURE_PATH } from "../config.js";
 import { createInset } from "./inset.js";
 import { createTour, observeSteps, STEPS } from "./tour.js";
-import { createFreeUI, createPickTooltip, createSources, fillCalc } from "./ui.js";
+import { createFreeUI, createNotes, createPickTooltip, createSources, fillCalc } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,7 +22,10 @@ async function loadData(useFixture) {
 function hasWebGL() {
   try {
     const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    if (!gl) return false;
+    gl.getExtension("WEBGL_lose_context")?.loseContext(); // 判定用のコンテキストを解放する
+    return true;
   } catch { return false; }
 }
 
@@ -89,6 +92,7 @@ async function main() {
 
   createSources({ data });
   fillCalc(data);
+  createNotes({ data });
   const inset = createInset({ root: $("inset"), data });
   let tour = null;
   const free = createFreeUI({ data, scene, inset, getStep: () => tour?.getStep() });

@@ -85,3 +85,7 @@ body[data-step="free"] .scene-step[data-step="free"] { opacity: 1; }
   .scene-step { min-height: 42vh; scroll-margin-top: 47vh; padding: 20px 0 28px; }
   .scene-step p { font-size: 14px; }
 }
+
+.year-notes, .notes-list { margin: 4px 0 0; padding-left: 1.2em; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.year-notes:empty { display: none; }
+.notes-list { font-size: 14px; color: var(--ink); }

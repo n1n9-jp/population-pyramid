@@ -1,5 +1,5 @@
 // free の UI（形・断面・世代）、ツールチップ、データ表、出典欄。
-import { ageHeading, formatPersons, formatTotal, wareki } from "../format.js";
+import { ageHeading, ageLabel, formatPersons, formatTotal, wareki } from "../format.js";
 import { ALL_COHORTS } from "./tour.js";
 
 const $ = (id) => document.getElementById(id);
@@ -35,6 +35,7 @@ export function createFreeUI({ data, scene, inset, getStep }) {
     note.textContent = message || (row.kazoe ? "この年の年齢は数え年です。" : "");
     inset.render(y);
     renderTable(data, y);
+    renderYearNotes(data, y);
   }
 
   function setCutFromUser(y, dir) {
@@ -47,10 +48,10 @@ export function createFreeUI({ data, scene, inset, getStep }) {
   slider.addEventListener("input", () => {
     const v = Number(slider.value);
     const dir = v >= lastRaw ? 1 : -1;
-    lastRaw = v;
+    lastRaw = v; // ドラッグ中は生の値を持つ（全国ページの timeline.js と同じ）
     setCutFromUser(v, dir);
-    lastRaw = year;
   });
+  // キー操作は現在値（解決後）からの±1なので、基準も現在値に合わせる
   slider.addEventListener("keydown", () => { lastRaw = year; });
 
   toggle.addEventListener("click", (e) => {
@@ -61,6 +62,7 @@ export function createFreeUI({ data, scene, inset, getStep }) {
   const selected = () => [...cohortBox.querySelectorAll("input[data-cohort]")].filter((i) => i.checked).map((i) => i.dataset.cohort);
   cohortBox.addEventListener("change", () => { if (getStep() === "free") scene.setHighlight(selected()); });
 
+  $("data-details").addEventListener("toggle", () => renderTable(data, year));
   showYear(year);
   return {
     attach(t) { tour = t; },
@@ -75,16 +77,23 @@ export function createFreeUI({ data, scene, inset, getStep }) {
 }
 
 function renderTable(data, year) {
+  const details = $("data-details");
+  if (!details.open) return; // 閉じている間は描かない（開いたとき toggle で描く）
   const y = data.byYear.get(year);
   const tbody = document.querySelector("#data-table tbody");
-  $("data-table-caption").textContent = `${year}年${y.kazoe ? "（数え年）" : ""}の年齢別人口（単位：人）`;
+  $("data-table-caption").textContent = `${year}年の年齢（各歳）・男女別人口（人）`;
+  const fmt = (v) => (v == null ? "—" : comma(v));
   const rows = [];
   for (let a = 0; a <= data.ageMax; a++) {
     const m = y.male[a], f = y.female[a];
-    if (m == null && f == null) continue;
     const tr = document.createElement("tr");
-    const cells = [ageHeading(y, a), m == null ? "–" : comma(m), f == null ? "–" : comma(f), m == null || f == null ? "–" : comma(m + f)];
-    cells.forEach((t) => { const td = document.createElement("td"); td.textContent = t; tr.append(td); });
+    const th = document.createElement("th");
+    th.scope = "row";
+    th.textContent = ageLabel(y, a);
+    tr.append(th);
+    [fmt(m), fmt(f), m == null || f == null ? "—" : fmt(m + f)].forEach((t) => {
+      const td = document.createElement("td"); td.textContent = t; tr.append(td);
+    });
     rows.push(tr);
   }
   tbody.replaceChildren(...rows);
@@ -170,4 +179,34 @@ export function fillCalc(data) {
     if (!fn) return;
     try { el.textContent = fn(); } catch { /* 静的な既定値のまま */ }
   });
+}
+
+/** 注記の文言は data.notes から描く。解説文中の [data-note-text] と「見方の注意」の一覧 */
+export function createNotes({ data }) {
+  document.querySelectorAll("[data-note-text]").forEach((el) => {
+    const n = data.notes[el.dataset.noteText];
+    if (n) el.textContent = n.text;
+  });
+  const ul = $("notes-list");
+  if (!ul) return;
+  for (const [id, n] of Object.entries(data.notes)) {
+    const li = document.createElement("li");
+    li.dataset.note = id;
+    li.textContent = n.text;
+    ul.append(li);
+  }
+}
+
+// 断面の年に当てはまる注記（年に応じて出す）
+function renderYearNotes(data, year) {
+  const ul = $("year-notes");
+  if (!ul) return;
+  const row = data.byYear.get(year);
+  const ids = (row && row.noteIds) || [];
+  ul.replaceChildren(...ids.filter((id) => data.notes[id]).map((id) => {
+    const li = document.createElement("li");
+    li.dataset.note = id;
+    li.textContent = data.notes[id].text;
+    return li;
+  }));
 }
