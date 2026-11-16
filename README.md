@@ -15,6 +15,8 @@
 
 2Dの2ページには、3Dページへ戻るリンク（「← 人口の山脈（3D）へ」）だけを置いています。
 
+計測タグ（Google タグマネージャー、コンテナID `GTM-KGP7P7TR`）を `index.html`・`national.html`・`regions.html` の `<head>` に入れています（転送ページ `mountain.html` には入れていません）。E2E では GTM / GA への通信を止めて検査します。
+
 ## ローカルで見る
 
 リポジトリ直下で次を実行し、<http://localhost:8000/>（3D）を開きます。全国の2Dは <http://localhost:8000/national.html> です。`file://` で直接開くと JSON を読み込めないため、必ずサーバー経由で開いてください。
