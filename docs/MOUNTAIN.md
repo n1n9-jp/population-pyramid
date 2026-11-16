@@ -1,5 +1,7 @@
 # 3Dページ「人口の山脈とコホートの糸」の契約（全担当が参照する）
 
+画面では「コホートの糸」を「世代の線」と表記する。
+
 公開の入口は、この3Dページ（`index.html`）にする。全国ページ（national.html）と地域別ページ（regions.html）は残すが、3Dページからはリンクせず、noindex にして、URLを直接開いた人だけが見られるようにする。旧 `mountain.html` は `/` への転送ページにする。この3Dページで、全国の各歳別人口を3Dで見せる。見た目の基準は、docs/mocks/3d/ の静止画モック（01〜08）と、その元になった mock.html。色は男女の色（モック01）を使う。
 
 Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newton-grgdly`。所有パスだけを add し、pull --rebase してから push する。force push はしない。

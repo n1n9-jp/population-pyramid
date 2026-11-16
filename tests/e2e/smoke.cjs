@@ -41,15 +41,23 @@ async function check(name, fn) {
   }
 }
 
+// 計測タグ（GTM / GA）への通信はテスト中は止める。止めた通信はエラー数に数えない。
+const BLOCKED_HOSTS = /^https:\/\/(www\.googletagmanager\.com|www\.google-analytics\.com)\//;
+const isBlockedUrl = (u) => BLOCKED_HOSTS.test(u || '');
+async function blockAnalytics(page) {
+  await page.route(BLOCKED_HOSTS, (route) => route.abort());
+}
+
 async function openPage(browser, opts, label, extra) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
+  await blockAnalytics(page);
   const mine = [];
   const rec = (kind, text) => { const p = `[${label}] ${kind}: ${text}`; mine.push(p); problems.push(p); };
-  page.on('console', (m) => { if (m.type() === 'error') rec('console.error', m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error' && !isBlockedUrl(m.location().url)) rec('console.error', m.text()); });
   page.on('pageerror', (e) => rec('pageerror', e.message));
-  page.on('requestfailed', (r) => rec('requestfailed', `${r.url()} ${r.failure() && r.failure().errorText}`));
-  page.on('response', (r) => { if (r.status() >= 400) rec('http' + r.status(), r.url()); });
+  page.on('requestfailed', (r) => { if (!isBlockedUrl(r.url())) rec('requestfailed', `${r.url()} ${r.failure() && r.failure().errorText}`); });
+  page.on('response', (r) => { if (r.status() >= 400 && !isBlockedUrl(r.url())) rec('http' + r.status(), r.url()); });
   const q = [];
   if (args.fixture) q.push('fixture=1');
   if (extra) q.push(extra);
@@ -159,6 +167,11 @@ async function main() {
       await sleep(300);
       assert(d.mine.length === 0, d.mine.join('\n'));
     });
+    await check('1c. head に GTM（GTM-KGP7P7TR）の gtm.js を読む script 要素がちょうど1つある', async () => {
+      const n = await dp.$$eval('head script[src*="googletagmanager.com/gtm.js?id=GTM-KGP7P7TR"]', (s) => s.length);
+      assert(n === 1, `gtm.js の script 要素数=${n}`);
+    });
+
     const xMax = data.xMaxPerSex;
 
     // ---- 2. 棒 ----

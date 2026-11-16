@@ -25,6 +25,7 @@ body {
   font-size: 13px; font-weight: 700; padding: 4px 8px;
 }
 .site-header h1 { font-size: clamp(22px, 5vw, 30px); margin: 12px 0 2px; line-height: 1.3; }
+.site-header .t-line { display: inline-block; }
 .site-header .range { color: var(--muted); font-weight: 400; font-size: 0.7em; white-space: nowrap; }
 .lede { margin: 0 0 8px; color: var(--muted); font-size: 14px; line-height: 1.5; text-wrap: balance; }
 h2 { font-size: 16px; margin: 0 0 6px; }

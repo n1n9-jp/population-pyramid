@@ -3,12 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>人口の山脈とコホートの糸 1920–2025</title>
-  <meta name="description" content="日本の各歳別人口を、年・年齢・人数の3軸の山脈として眺めます。同じ年に生まれた世代の軌跡（コホートの糸）をたどれます。">
+  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-KGP7P7TR"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+  </script>
+  <title>人口の山脈をたどる：世代の100年 1920–2025</title>
+  <meta name="description" content="日本の各歳別人口を、年・年齢・人数の3軸の山脈として眺めます。同じ年に生まれた世代が年を重ねていく道すじ（世代の線）をたどれます。">
   <link rel="canonical" href="https://population-pyramid.structure-and-representation.com/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="人口の山脈とコホートの糸 1920–2025">
-  <meta property="og:description" content="日本の各歳別人口を、年・年齢・人数の3軸の山脈として眺めます。同じ年に生まれた世代の軌跡（コホートの糸）をたどれます。">
+  <meta property="og:title" content="人口の山脈をたどる：世代の100年 1920–2025">
+  <meta property="og:description" content="日本の各歳別人口を、年・年齢・人数の3軸の山脈として眺めます。同じ年に生まれた世代が年を重ねていく道すじ（世代の線）をたどれます。">
   <meta property="og:url" content="https://population-pyramid.structure-and-representation.com/">
   <meta property="og:image" content="https://population-pyramid.structure-and-representation.com/assets/mountain-fallback.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -33,7 +39,7 @@
           <ul class="legend-list">
             <li><span class="sw sw-male"></span>男性（手前）</li>
             <li><span class="sw sw-female"></span>女性（奥）</li>
-            <li><span class="sw sw-thread"><i class="tm"></i><i class="tf"></i></span>強調する世代の糸（男性・女性）</li>
+            <li><span class="sw sw-thread"><i class="tm"></i><i class="tf"></i></span>強調する世代の線（男性・女性）</li>
             <li><span class="sw sw-dash"></span>終戦前後（破線）</li>
             <li><span class="sw sw-kazoe"></span>数え年の年（淡色）</li>
             <li><span class="sw sw-gap"></span><span id="legend-gap">推計なし（1941〜43年）</span></li>
@@ -53,33 +59,33 @@
 
     <div class="m-text">
       <header class="site-header">
-        <h1>人口の山脈とコホートの糸 <span class="range">1920–2025</span></h1>
+        <h1><span class="t-line">人口の山脈をたどる：</span><span class="t-line">世代の100年</span> <span class="range">1920–2025</span></h1>
         <p class="lede">日本の各歳・男女別の人口を、年・年齢・人数の3軸で立体にしました。<span class="d3-only">スクロールすると、見る場所が切り替わります。</span></p>
       </header>
 
       <section class="scene-step" data-step="overview" aria-labelledby="h-overview">
         <h2 id="h-overview">人口の山脈を、年と年齢で眺める</h2>
         <p>横が年（1920→2025）、奥行きが年齢（0→100歳）、高さが人数です。手前の面が男性、奥の面が女性で、100歳の側を境に鏡写しに置いています。</p>
-        <p>山脈の表面を斜めに走る細い線は、同じ年に生まれた世代の軌跡です。年が進むほど、世代は1歳ずつ年齢を重ねます。</p>
+        <p>山脈の表面を斜めに走る線は、同じ年に生まれた人たちが年を重ねていく道すじです。このページでは「世代の線」と呼びます。年が進むほど、世代は1歳ずつ年齢を重ねます。</p>
         <p>総人口は、1920年の<span data-calc="total-1920">5,596万人</span>から、2025年の<span data-calc="total-2025">1億2,297万人</span>になりました。</p>
       </section>
 
       <section class="scene-step" data-step="war" aria-labelledby="h-war">
         <h2 id="h-war">戦争の時期は、データに切れ目がある</h2>
-        <p><span data-note-text="gap-1941-1943">1941〜1943年は年齢別の人口推計が行われていないため、表示していません。</span>面にはすき間が空き、補間はしません。<span data-note-text="kazoe">1944〜1946年の年齢は数え年です。</span>その帯は淡く描き、世代の糸も破線にしています。</p>
+        <p><span data-note-text="gap-1941-1943">1941〜1943年は年齢別の人口推計が行われていないため、表示していません。</span>面にはすき間が空き、補間はしません。<span data-note-text="kazoe">1944〜1946年の年齢は数え年です。</span>その帯は淡く描き、世代の線も破線にしています。</p>
         <p>終戦前後の1945〜1946年生まれ（破線）は、出生が大きく減った世代です。1950年には、3歳（1947年生まれ）の<span data-calc="p1950-3">235万人</span>に対し、4歳（1946年生まれ）は<span data-calc="p1950-4">154万人</span>しかいません。</p>
       </section>
 
       <section class="scene-step" data-step="dankai" aria-labelledby="h-dankai">
         <h2 id="h-dankai">団塊の世代：第1次ベビーブーム</h2>
         <p>1947〜1949年に生まれた「団塊の世代」は、戦後の第1次ベビーブームの世代です。<a href="https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei25/dl/05_gaikyouR07.pdf" target="_blank" rel="noopener">厚生労働省「人口動態統計」</a>によると、出生数は1947年に2,678,792人、1948年に2,681,624人、1949年に2,696,638人でした。1947〜1972年の出生数には沖縄県を含みません。</p>
-        <p>強調した糸をたどると、この世代は2025年に76〜78歳で、合わせて約<span data-calc="dankai-2025">552万人</span>です。</p>
+        <p>強調した世代の線をたどると、この世代は2025年に76〜78歳で、合わせて約<span data-calc="dankai-2025">552万人</span>です。</p>
       </section>
 
       <section class="scene-step" data-step="hinoeuma" aria-labelledby="h-hinoeuma">
         <h2 id="h-hinoeuma">丙午（1966年生まれ）：出生数の谷</h2>
         <p>1966年は丙午（ひのえうま）の年です。出生数は、前年の1965年に1,823,697人、1966年に1,360,974人、翌1967年に1,935,647人でした（<a href="https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei25/dl/05_gaikyouR07.pdf" target="_blank" rel="noopener">厚生労働省「人口動態統計」</a>）。1947〜1972年の出生数には沖縄県を含みません。</p>
-        <p>糸は、2025年の断面ではここだけ谷を通ります。2025年には59歳で<span data-calc="h-59">138万人</span>と、58歳の<span data-calc="h-58">178万人</span>、60歳の<span data-calc="h-60">170万人</span>より少なくなっています。</p>
+        <p>この世代の線は、2025年の断面ではここだけ谷を通ります。2025年には59歳で<span data-calc="h-59">138万人</span>と、58歳の<span data-calc="h-58">178万人</span>、60歳の<span data-calc="h-60">170万人</span>より少なくなっています。</p>
       </section>
 
       <section class="scene-step" data-step="dankai-jr" aria-labelledby="h-dankai-jr">
@@ -90,7 +96,7 @@
 
       <section class="scene-step" data-step="flight" aria-labelledby="h-flight">
         <h2 id="h-flight">団塊の世代の尾根に沿って飛ぶ</h2>
-        <p class="d3-only">団塊の世代（1947〜49年生まれ）の糸に沿って、男性の面の尾根のすぐ脇を低く飛びます。生まれた年から2025年まで、この世代が年齢を重ねていく道のりを、尾根の際からたどります。</p>
+        <p class="d3-only">団塊の世代（1947〜49年生まれ）の世代の線に沿って、男性の面の尾根のすぐ脇を低く飛びます。生まれた年から2025年まで、この世代が年齢を重ねていく道のりを、尾根の際からたどります。</p>
         <p class="d3-only">左に見える高い尾根が団塊の世代、右の谷とその先の尾根が、後から生まれた世代です。画面に触れると止まります。</p>
         <p class="fallback-only">対応した環境では、団塊の世代の尾根に沿って、生まれた年から2025年まで低く飛ぶ視点を表示します。</p>
         <p class="d3-only"><button type="button" id="btn-fly-again" class="btn-reset">もう一度飛ぶ</button></p>
@@ -105,7 +111,7 @@
 
       <section class="scene-step" id="free" data-step="free" aria-labelledby="h-free">
         <h2 id="h-free">自分で動かして確かめる</h2>
-        <p class="d3-only">ドラッグで回転、ホイールやピンチで拡大・縮小できます。山脈や糸にカーソルを合わせる（スマートフォンではタップする）と、その地点の人数が出ます。</p>
+        <p class="d3-only">ドラッグで回転、ホイールやピンチで拡大・縮小できます。山脈や世代の線にカーソルを合わせる（スマートフォンではタップする）と、その地点の人数が出ます。</p>
         <div class="free-ui">
           <div class="ctl-group d3-only">
             <span class="ctl-label" id="lbl-form">形</span>

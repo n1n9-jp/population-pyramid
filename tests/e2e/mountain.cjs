@@ -1,5 +1,5 @@
 'use strict';
-// 3Dページ「人口の山脈とコホートの糸」（/ = index.html）の E2E テスト。仕様は docs/MOUNTAIN.md §4〜§7。
+// 3Dページ「人口の山脈をたどる：世代の100年」（/ = index.html）の E2E テスト。仕様は docs/MOUNTAIN.md §4〜§7。
 // 使い方: node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--stub] [--out DIR]
 // --stub は ?stub=1（scene-stub.js）で開く。3D 描画は検査せず、状態・UI・ツールチップだけを検査する。
 const path = require('path');
@@ -64,9 +64,17 @@ function url(q, noStub) {
   return `${args.base}/${parts.length ? '?' + parts.join('&') : ''}`;
 }
 
+// 計測タグ（GTM / GA）への通信はテスト中は止める。止めた通信はエラー数に数えない。
+const BLOCKED_HOSTS = /^https:\/\/(www\.googletagmanager\.com|www\.google-analytics\.com)\//;
+const isBlockedUrl = (u) => BLOCKED_HOSTS.test(u || '');
+async function blockAnalytics(page) {
+  await page.route(BLOCKED_HOSTS, (route) => route.abort());
+}
+
 async function openPage(browser, opts, label, extra, { record = true, init, waitReady = true, noStub = false } = {}) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
+  await blockAnalytics(page);
   if (init) await page.addInitScript(init);
   const mine = [];
   const rec = (kind, text) => {
@@ -74,10 +82,10 @@ async function openPage(browser, opts, label, extra, { record = true, init, wait
     mine.push(p);
     if (record) problems.push(p);
   };
-  page.on('console', (m) => { if (m.type() === 'error') rec('console.error', m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error' && !isBlockedUrl(m.location().url)) rec('console.error', m.text()); });
   page.on('pageerror', (e) => rec('pageerror', e.message));
-  page.on('requestfailed', (r) => rec('requestfailed', `${r.url()} ${r.failure() && r.failure().errorText}`));
-  page.on('response', (r) => { if (r.status() >= 400) rec('http' + r.status(), r.url()); });
+  page.on('requestfailed', (r) => { if (!isBlockedUrl(r.url())) rec('requestfailed', `${r.url()} ${r.failure() && r.failure().errorText}`); });
+  page.on('response', (r) => { if (r.status() >= 400 && !isBlockedUrl(r.url())) rec('http' + r.status(), r.url()); });
   await page.goto(url(extra, noStub), { waitUntil: 'load' });
   if (waitReady) await page.waitForSelector('body[data-ready="true"]', { timeout: 90000 });
   return { ctx, page, mine };
@@ -168,6 +176,10 @@ async function main() {
       assert(d.mine.length === 0, d.mine.join('\n'));
     });
 
+    await check('1c. head に GTM（GTM-KGP7P7TR）の gtm.js を読む script 要素がちょうど1つある', async () => {
+      const n = await dp.$$eval('head script[src*="googletagmanager.com/gtm.js?id=GTM-KGP7P7TR"]', (s) => s.length);
+      assert(n === 1, `gtm.js の script 要素数=${n}`);
+    });
     await check('2. canvas#mountain-canvas に描画がある（白でない画素が3%以上）', async () => {
       assert(await dp.locator('canvas#mountain-canvas').count() === 1, 'canvas#mountain-canvas が1つでない');
       let r = null;
@@ -347,7 +359,7 @@ async function main() {
       assert(bad.slice(0, 8).length === 0, bad.slice(0, 8).join('\n'));
     });
 
-    await check('4g. ツールチップ：糸か面をクリックすると #pick-tooltip に「N年生まれ」・年と年齢・男女と人数が、全国ページの書式で出る', async () => {
+    await check('4g. ツールチップ：世代の線か面をクリックすると #pick-tooltip に「N年生まれ」・年と年齢・男女と人数が、全国ページの書式で出る', async () => {
       await fp.locator('#form-toggle button[data-form="terrain"]').click();
       await fp.locator('#cut-slider').fill('2025');
       const box = await fp.locator('canvas#mountain-canvas').boundingBox();
@@ -781,6 +793,12 @@ async function main() {
       assert(still, 'タップの後、ツールチップがすぐ消える');
     });
 
+    await check('11a2. ページの本文（body の innerText）に「糸」と「コホート」が出てこない（用語は「世代の線」に統一）', async () => {
+      const text = await dp.evaluate(() => document.body.innerText);
+      const found = ['糸', 'コホート'].filter((w) => text.includes(w));
+      assert(found.length === 0, `本文に旧用語が残っている: ${found.join('、')}`);
+    });
+
     await check('11b. 凡例：375px では折りたたまれ、段の強調する世代の名前が出る。1280px では開いている', async () => {
       const bad = [];
       const open375 = await mp.evaluate(() => document.getElementById('legend-details').open);
@@ -789,7 +807,7 @@ async function main() {
       if (rect.l < rect.cl - 1 || rect.r > rect.cr + 1 || rect.t < rect.ct - 1 || rect.b > rect.cb + 1) bad.push(`凡例が canvas からはみ出す: ${JSON.stringify(rect)}`);
       await mp.evaluate(() => document.getElementById('legend-details').setAttribute('open', ''));
       const items = await mp.$$eval('#legend-details .legend-list li', (l) => l.map((x) => x.textContent.trim()));
-      for (const w of ['男性', '女性', '強調する世代の糸', '破線', '数え年', '推計なし']) {
+      for (const w of ['男性', '女性', '強調する世代の線', '破線', '数え年', '推計なし']) {
         if (!items.some((t) => t.includes(w))) bad.push(`凡例に「${w}」がない: ${JSON.stringify(items)}`);
       }
       const want = { dankai: '団塊の世代 1947〜49年生まれ', hinoeuma: '丙午 1966年生まれ', 'dankai-jr': '団塊ジュニア 1971〜74年生まれ', war: '終戦前後 1945〜46年生まれ' };
