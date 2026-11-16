@@ -400,6 +400,133 @@ async function main() {
       assert(vis === args.fixture, `帯の表示=${vis} 期待=${args.fixture}`);
       if (args.fixture) assert(/サンプルデータ/.test(await fp.textContent('#fixture-banner')), '帯に「サンプルデータ」がない');
     });
+
+    // ---- 4j〜: 再生・巻き戻し・単年スライダー ----
+    // scene.setCutYear を包んで、再生中に scene へ渡った年を記録する
+    const hookYears = () => fp.evaluate(() => {
+      const sc = window.__mountain.scene;
+      window.__cutLog = [];
+      if (!sc.__wrapped) {
+        const orig = sc.setCutYear.bind(sc);
+        sc.setCutYear = (y) => { window.__cutLog.push(y); return orig(y); };
+        sc.__wrapped = true;
+      }
+    });
+    const playLabel = () => fp.getAttribute('#btn-cut-play', 'aria-label');
+    const setYear = async (y) => {
+      await fp.locator('#cut-slider').fill(String(y));
+      await fp.waitForFunction((yy) => window.__mountain.scene.getState().cutYear === yy, y, { timeout: 4000 });
+      await sleep(100);
+    };
+    await check('4j. #btn-cut-play：2秒後に年が2年以上進み、aria-label が「一時停止」になる。もう一度押すと止まる', async () => {
+      await setYear(1960);
+      assert(await playLabel() === '再生', `開始前の aria-label=${await playLabel()}`);
+      await fp.click('#btn-cut-play');
+      await sleep(2000);
+      const mid = Number(await fp.inputValue('#cut-slider'));
+      assert(mid - 1960 >= 2, `2秒後の年=${mid}（2年以上進むはず）`);
+      assert(await playLabel() === '一時停止', `再生中の aria-label=${await playLabel()}`);
+      assert(await fp.getAttribute('#cut-year-out', 'aria-live') === 'off', '再生中の aria-live が off でない');
+      await fp.click('#btn-cut-play');
+      assert(await playLabel() === '再生', '一時停止後の aria-label が「再生」でない');
+      assert(await fp.getAttribute('#cut-year-out', 'aria-live') === 'polite', '停止後の aria-live が polite でない');
+      const stopped = Number(await fp.inputValue('#cut-slider'));
+      assert((await getState(fp)).cutYear === stopped, 'scene の cutYear がスライダーと違う');
+      await sleep(900);
+      assert(Number(await fp.inputValue('#cut-slider')) === stopped, '一時停止後も年が進んだ');
+    });
+
+    await check('4k. 1939年から再生すると、記録した年に1941〜43年が含まれず、1940の次は1944になる', async () => {
+      await setYear(1939);
+      await hookYears();
+      await fp.click('#btn-cut-play');
+      await fp.waitForFunction(() => window.__cutLog.length >= 3, null, { timeout: 5000 });
+      await fp.click('#btn-cut-play');
+      const log = await fp.evaluate(() => window.__cutLog);
+      const bad = log.filter((y) => y >= 1941 && y <= 1943);
+      assert(bad.length === 0, `データのない年を表示した: ${bad.join(',')}（記録=${log.join(',')}）`);
+      assert(log[0] === 1940 && log[1] === 1944, `記録=${log.join(',')} 期待=1940,1944,…`);
+    });
+
+    await check('4l. 2024年から再生すると2025年で止まり、aria-label が「再生」に戻る。最終年で押すと1920年から始まる', async () => {
+      await setYear(2024);
+      await fp.click('#btn-cut-play');
+      await fp.waitForFunction(() => document.getElementById('cut-slider').value === '2025', null, { timeout: 3000 });
+      await sleep(300);
+      assert(await playLabel() === '再生', `2025年到達後の aria-label=${await playLabel()}`);
+      assert((await getState(fp)).cutYear === 2025, 'cutYear が2025でない');
+      await sleep(900);
+      assert(await fp.inputValue('#cut-slider') === '2025', '2025年のあとも動いた');
+      await fp.click('#btn-cut-play');
+      assert(await fp.inputValue('#cut-slider') === '1920', `最終年から再生した直後の年=${await fp.inputValue('#cut-slider')} 期待=1920`);
+      assert(await playLabel() === '一時停止', '最終年から再生しても「一時停止」にならない');
+      await fp.click('#btn-cut-play');
+    });
+
+    await check('4m. #btn-cut-rewind：再生を止めて1920年に戻す（aria-label「最初に戻る」）', async () => {
+      assert(await fp.getAttribute('#btn-cut-rewind', 'aria-label') === '最初に戻る', 'aria-label が「最初に戻る」でない');
+      await setYear(1980);
+      await fp.click('#btn-cut-play');
+      await sleep(600);
+      await fp.click('#btn-cut-rewind');
+      assert(await fp.inputValue('#cut-slider') === '1920', `巻き戻し後の年=${await fp.inputValue('#cut-slider')}`);
+      assert(await playLabel() === '再生', '巻き戻し後の aria-label が「再生」でない');
+      await fp.waitForFunction(() => window.__mountain.scene.getState().cutYear === 1920, null, { timeout: 3000 });
+      await sleep(900);
+      assert(await fp.inputValue('#cut-slider') === '1920', '巻き戻し後に年が進んだ');
+    });
+
+    await check('4n. 再生中にスライダーを操作すると再生が止まる', async () => {
+      await setYear(1950);
+      await fp.click('#btn-cut-play');
+      await sleep(500);
+      await fp.locator('#cut-slider').fill('1990');
+      await sleep(100);
+      assert(await playLabel() === '再生', 'スライダー操作後も再生中のまま');
+      await sleep(900);
+      assert(await fp.inputValue('#cut-slider') === '1990', `操作後に年が進んだ: ${await fp.inputValue('#cut-slider')}`);
+    });
+
+    await check('4o. 再生中に free 以外の段へスクロールすると再生が止まる', async () => {
+      await setYear(1950);
+      await fp.click('#btn-cut-play');
+      await sleep(500);
+      await scrollToStep(fp, 'hinoeuma');
+      await waitBodyStep(fp, 'hinoeuma');
+      assert(await playLabel() === '再生', `他の段に移ったあとの aria-label=${await playLabel()}`);
+      await scrollToStep(fp, 'free');
+      await waitBodyStep(fp, 'free');
+    });
+
+    await check('4p. スライダーのトラックは左から塗られていない（つまみの左右でレールの色が同じ）', async () => {
+      await setYear(1966);
+      await fp.evaluate(() => document.getElementById('cut-timeline').scrollIntoView({ block: 'center' }));
+      await sleep(200);
+      const box = await fp.locator('#cut-timeline').boundingBox();
+      const thumbX = await fp.evaluate(() => {
+        const s = document.getElementById('cut-slider');
+        const r = s.getBoundingClientRect();
+        return r.left + 8 + ((Number(s.value) - Number(s.min)) / (Number(s.max) - Number(s.min))) * (r.width - 16);
+      });
+      const railY = box.y + 34;
+      const buf = await fp.screenshot({ clip: { x: 0, y: Math.floor(railY - 6), width: 1280, height: 12 } });
+      const px = await fp.evaluate(async ({ src, xs }) => {
+        const img = new Image(); img.src = 'data:image/png;base64,' + src; await img.decode();
+        const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+        const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+        const sc = img.naturalWidth / 1280;
+        // レールは y 方向に 2px。上下 12px の帯の中から、背景と違う行を探して色を取る
+        const col = (x) => {
+          const out = [];
+          for (let yy = 0; yy < c.height; yy++) out.push([...g.getImageData(Math.round(x * sc), yy, 1, 1).data].slice(0, 3).join(','));
+          return out.join('|');
+        };
+        return xs.map(col);
+      }, { src: buf.toString('base64'), xs: [thumbX - 40, thumbX + 40] });
+      assert(px[0] === px[1], `つまみの左右でトラックの画素列が違う\n左=${px[0]}\n右=${px[1]}`);
+      const accent = await fp.evaluate(() => getComputedStyle(document.getElementById('cut-slider'), '::-webkit-slider-runnable-track').backgroundColor);
+      assert(/rgba\(0, 0, 0, 0\)|transparent/.test(accent), `トラックの背景が透明でない: ${accent}`);
+    });
     await f.ctx.close();
 
     // ---- 5: ?step=war ----

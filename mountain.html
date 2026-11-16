@@ -100,8 +100,19 @@
             </div>
           </div>
           <div class="ctl-group">
-            <label class="ctl-label" for="cut-slider">断面の年：<output id="cut-year-out" for="cut-slider">2025年</output></label>
-            <input type="range" id="cut-slider" min="1920" max="2025" step="1" value="2025">
+            <label class="ctl-label" for="cut-slider">断面の年：<output id="cut-year-out" for="cut-slider" aria-live="polite">2025年</output></label>
+            <div class="cut-controls">
+              <div class="buttons">
+                <button type="button" id="btn-cut-rewind" class="btn" aria-label="最初に戻る">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>
+                </button>
+                <button type="button" id="btn-cut-play" class="btn btn-primary" aria-label="再生"></button>
+              </div>
+              <div id="cut-timeline" class="cut-timeline">
+                <svg id="cut-ticks" aria-hidden="true" focusable="false"></svg>
+                <input type="range" id="cut-slider" min="1920" max="2025" step="1" value="2025">
+              </div>
+            </div>
             <p id="cut-note" class="ctl-note" aria-live="polite"></p>
             <ul id="year-notes" class="year-notes"></ul>
           </div>

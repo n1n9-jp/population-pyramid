@@ -67,6 +67,7 @@ export function createTour({ scene, free, reducedMotion, legend }) {
     const s = STEPS[id];
     if (!s || id === current) return;
     clearTimeout(timer);
+    free.onStep?.(id);
     current = id;
     document.body.dataset.step = id;
     const cv = document.getElementById("mountain-canvas");

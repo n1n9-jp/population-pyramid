@@ -44,7 +44,31 @@ body[data-step="free"] .scene-step[data-step="free"] { color: var(--ink); }
 .seg button:first-child { border-radius: 6px 0 0 6px; }
 .seg button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
 .seg button[aria-pressed="true"] { background: var(--male-strong); border-color: var(--male-strong); color: #fff; font-weight: 700; }
-#cut-slider { width: 100%; height: 32px; margin: 0; accent-color: var(--male-strong); cursor: pointer; }
+.cut-controls { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 12px; }
+.cut-timeline { position: relative; flex: 1 1 220px; min-width: 0; height: 66px; }
+.cut-timeline svg { position: absolute; left: 0; top: 0; width: 100%; height: 66px; pointer-events: none; display: block; }
+.cut-timeline text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+.cut-timeline .cut-rail { stroke: var(--grid); stroke-width: 2; }
+.cut-timeline .cut-tick { stroke: var(--muted); stroke-opacity: .8; stroke-width: 1; shape-rendering: crispEdges; }
+.cut-timeline .cut-gap { stroke: var(--muted); stroke-opacity: .5; stroke-width: 1; }
+.cut-timeline .cut-hatch { stroke: var(--muted); stroke-opacity: .6; stroke-width: 1.5; }
+.cut-timeline .cut-pill { fill: #fffdf6; stroke: var(--male-strong); stroke-width: 1.5; }
+.cut-timeline .cut-year-label { fill: var(--ink); font-size: 13px; font-weight: 700; }
+#cut-slider {
+  position: absolute; left: 8px; top: 20px; width: calc(100% - 16px); height: 28px; margin: 0; padding: 0;
+  background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; accent-color: var(--male-strong);
+}
+#cut-slider::-webkit-slider-runnable-track { height: 28px; background: transparent; }
+#cut-slider::-moz-range-track { height: 28px; background: transparent; }
+#cut-slider::-moz-range-progress { background: transparent; }
+#cut-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 28px; border-radius: 4px;
+  background: var(--male-strong); border: 2px solid #fffdf6; box-shadow: 0 0 0 1px var(--muted);
+}
+#cut-slider::-moz-range-thumb {
+  width: 12px; height: 24px; border-radius: 4px; background: var(--male-strong);
+  border: 2px solid #fffdf6; box-shadow: 0 0 0 1px var(--muted);
+}
 
 .inset { width: 100%; max-width: 360px; background: #fffdf6; border: 1px solid var(--grid); }
 .inset-svg { display: block; width: 100%; height: auto; }

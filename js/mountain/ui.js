@@ -16,6 +16,65 @@ export function createFreeUI({ data, scene, inset, getStep, legend }) {
   let year = yearMax;
   let lastRaw = yearMax;
 
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const ticks = $("cut-ticks");
+  const timelineBox = $("cut-timeline");
+  const playBtn = $("btn-cut-play");
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+  const RAIL_Y = 34; // スライダー（top 20px・高さ 28px）の中心
+  const THUMB_HALF = 16; // 余白 8px + つまみ幅の半分 8px
+  let width = 0;
+  let pill = null, pillText = null;
+  const el = (name, attrs, parent = ticks) => {
+    const e = document.createElementNS(SVGNS, name);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    parent.append(e);
+    return e;
+  };
+  const xOf = (y) => THUMB_HALF + ((y - yearMin) / (yearMax - yearMin)) * (width - 2 * THUMB_HALF);
+
+  // 左から塗らない一様なレール、目盛り、端の年、推計なしの網掛け。選んだ年はつまみとラベルで示す
+  function drawTimeline() {
+    width = timelineBox.clientWidth;
+    ticks.replaceChildren();
+    if (!width) return;
+    const unit = (width - 2 * THUMB_HALF) / (yearMax - yearMin);
+    const defs = el("defs", {});
+    const pat = el("pattern", { id: "cut-gap-hatch", width: 5, height: 5, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+    el("line", { x1: 0, x2: 0, y1: 0, y2: 5, class: "cut-hatch" }, pat);
+    el("line", { class: "cut-rail", x1: xOf(yearMin), x2: xOf(yearMax), y1: RAIL_Y, y2: RAIL_Y });
+    for (let y = yearMin; y <= yearMax; y++) {
+      if (gapOf(y)) continue;
+      const end = y === yearMin || y === yearMax;
+      if (y % 10 !== 0 && !end) continue;
+      el("line", { class: "cut-tick", x1: xOf(y), x2: xOf(y), y1: RAIL_Y + 3, y2: RAIL_Y + (y % 10 === 0 ? 10 : 7) });
+      const every = width < 420 ? 20 : 10;
+      const farFromEnds = xOf(y) - xOf(yearMin) >= 34 && xOf(yearMax) - xOf(y) >= 34;
+      if (end || (y % every === 0 && farFromEnds)) {
+        const t = el("text", { x: xOf(y), y: 60, "text-anchor": y === yearMin ? "start" : y === yearMax ? "end" : "middle" });
+        t.textContent = y;
+        if (y === yearMin) t.setAttribute("x", Math.max(0, xOf(y) - 8));
+        if (y === yearMax) t.setAttribute("x", Math.min(width, xOf(y) + 8));
+      }
+    }
+    for (const g of gaps) {
+      const x0 = xOf(g.start) - unit / 2, x1 = xOf(g.end) + unit / 2;
+      el("rect", { class: "cut-gap", x: x0, y: RAIL_Y - 8, width: x1 - x0, height: 16, fill: "url(#cut-gap-hatch)" });
+    }
+    pill = el("rect", { class: "cut-pill", y: 1, height: 18, rx: 9 });
+    pillText = el("text", { class: "cut-year-label", y: 14, "text-anchor": "middle" });
+    placeLabel();
+  }
+  function placeLabel() {
+    if (!pill || !width) return;
+    pillText.textContent = `${year}年`;
+    const w = 58;
+    const cx = Math.max(w / 2, Math.min(width - w / 2, xOf(year)));
+    pill.setAttribute("x", cx - w / 2); pill.setAttribute("width", w);
+    pillText.setAttribute("x", cx);
+  }
+
   slider.min = yearMin; slider.max = yearMax; slider.step = 1; slider.value = year;
 
   const gapOf = (y) => gaps.find((g) => y >= g.start && y <= g.end);
@@ -29,6 +88,7 @@ export function createFreeUI({ data, scene, inset, getStep, legend }) {
   function showYear(y, message = "") {
     year = y;
     slider.value = y;
+    placeLabel();
     const row = data.byYear.get(y);
     out.textContent = `${y}年（${wareki(row.refDate)}）`;
     slider.setAttribute("aria-valuetext", `${y}年${row.kazoe ? "（数え年）" : ""}`);
@@ -37,6 +97,50 @@ export function createFreeUI({ data, scene, inset, getStep, legend }) {
     renderTable(data, y);
     renderYearNotes(data, y);
   }
+
+  // ---- 再生 ----
+  const PLAY_MS = 400;
+  let playing = false;
+  let playTimer = 0;
+  function setPlaying(on) {
+    playing = on;
+    clearTimeout(playTimer);
+    playTimer = 0;
+    playBtn.innerHTML = on ? ICON_PAUSE : ICON_PLAY;
+    playBtn.setAttribute("aria-label", on ? "一時停止" : "再生");
+    out.setAttribute("aria-live", on ? "off" : "polite");
+    note.setAttribute("aria-live", on ? "off" : "polite");
+  }
+  function stop() { if (playing) setPlaying(false); }
+  function goto(y) {
+    showYear(y);
+    if (getStep() === "free") scene.setCutYear(y);
+  }
+  function tick() {
+    playTimer = 0;
+    if (!playing) return;
+    if (getStep() !== "free") { stop(); return; }
+    const next = resolve(year + 1, 1);
+    if (next > yearMax) { stop(); return; }
+    goto(next);
+    lastRaw = next;
+    if (next >= yearMax) stop();
+    else playTimer = setTimeout(tick, PLAY_MS);
+  }
+  function start() {
+    if (year >= yearMax) { goto(yearMin); lastRaw = yearMin; }
+    setPlaying(true);
+    playTimer = setTimeout(tick, PLAY_MS);
+  }
+  playBtn.addEventListener("click", () => { if (playing) stop(); else start(); });
+  $("btn-cut-rewind").addEventListener("click", () => {
+    stop();
+    if (pending) { pending = null; cancelAnimationFrame(raf); raf = 0; }
+    goto(yearMin);
+    lastRaw = yearMin;
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); });
+  setPlaying(false);
 
   function setCutFromUser(y, dir) {
     const r = resolve(y, dir);
@@ -56,6 +160,7 @@ export function createFreeUI({ data, scene, inset, getStep, legend }) {
     setCutFromUser(v, dir);
   };
   slider.addEventListener("input", () => {
+    stop();
     const v = Number(slider.value);
     const dir = v >= lastRaw ? 1 : -1;
     lastRaw = v; // ドラッグ中は生の値を持つ（全国ページの timeline.js と同じ）
@@ -64,7 +169,8 @@ export function createFreeUI({ data, scene, inset, getStep, legend }) {
   });
   slider.addEventListener("change", () => { if (raf) { cancelAnimationFrame(raf); flush(); } });
   // キー操作は現在値（解決後）からの±1なので、基準も現在値に合わせる
-  slider.addEventListener("keydown", () => { lastRaw = year; });
+  slider.addEventListener("keydown", () => { lastRaw = year; stop(); });
+  slider.addEventListener("pointerdown", stop);
 
   toggle.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-form]");
@@ -86,10 +192,13 @@ export function createFreeUI({ data, scene, inset, getStep, legend }) {
   });
 
   $("data-details").addEventListener("toggle", () => renderTable(data, year));
+  drawTimeline();
+  new ResizeObserver(() => { if (timelineBox.clientWidth !== width) drawTimeline(); }).observe(timelineBox);
   showYear(year);
   return {
     attach(t) { tour = t; },
     getCut: () => year,
+    onStep(id) { if (id !== "free") stop(); },
     getHighlight: () => selected(),
     onForm(f) {
       toggle.querySelectorAll("button[data-form]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.form === f)));
