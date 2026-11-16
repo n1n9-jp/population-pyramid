@@ -73,11 +73,15 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
   - 断面のスライダー：`#cut-slider`。値は年で、1920〜2025。データのない年は全国ページと同じく、移動の向きで解決する。
   - 強調する世代の選択：`#cohort-select input[data-cohort]`
   - 断面の2D小窓：`#inset`。中は SVG で、棒は `rect.inset-bar[data-sex][data-age][data-value]`。
+    - 小窓は全国ページと同じく、各年の `openAge` の段も棒（`.inset-open`、淡く描く）で出す。面（3D）には含めない。E2E は「openAge の段は `.inset-open` であること」を確かめる。
+    - 小窓の年齢の目盛りは、棒より後に描き、隠れないようにする。
+- **注記**：文言は `data.notes` から描く。解説文中の `[data-note-text]`、free の `#year-notes`（断面の年の `noteIds` に当てはまる注記）、「見方の注意」の `#notes-list`（全注記）。
+- **free の canvas**：free の段では `#mountain-canvas[data-free="true"]` にし、スマホで回転とピンチができるよう `touch-action: none` にする。
 - **ツールチップ**：`#pick-tooltip`。hidden 属性で出し入れする。内容は、世代（「1949年生まれ」）、その年、年齢、人数。人数の書式は js/format.js の formatPersons に合わせる。
 - **代わりの表示**：WebGL が使えないときは `#webgl-fallback` に静止画 `assets/mountain-fallback.png`（モック01と同じ構図）を出し、案内文を添える。
 - **reduced motion**：変形もカメラの移動もしない。各段では最終の状態をそのまま表示する。
 - **補助**
-  - データ表を `<details>` に入れる。中身は、断面の年の各歳と男女の人数。
+  - データ表を `<details>` に入れる。中身は、断面の年の各歳と男女の人数。全国ページと同じ形式（年齢は `th scope=row`、値のない所は「—」、全行を表示し、閉じている間は描かない）。
   - 全国ページと地域別ページへのリンクを置く。
   - index.html と regions.html の `.page-nav` に「3Dで見る →」を1行ずつ足す。ほかの部分は変えない。
 - **URL**：`?step=<data-step>` を付けて開くと、その段にスクロールした状態で始まる。
@@ -90,5 +94,5 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
 
 ## 7. 実行コマンド
 - `python3 -m http.server 8000` を起動して `http://localhost:8000/mountain.html` を開く。
-- E2E：`node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--out DIR]`。WebGL が要るので、chromium は `--use-gl=swiftshader --enable-unsafe-swiftshader` を付けて起動する（docs/mocks/3d/shoot.js を参照）。
+- E2E：`node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--stub] [--out DIR]`（`--stub` は `?stub=1` の仮実装で開く）。WebGL が要るので、chromium は `--use-gl=swiftshader --enable-unsafe-swiftshader` を付けて起動する（docs/mocks/3d/shoot.js を参照）。
 - smoke.cjs と regions.cjs も合格のままにすること。
