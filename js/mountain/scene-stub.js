@@ -89,6 +89,9 @@ export function createMountain({ canvas, data, reducedMotion }) {
         if (f.progress >= 1) endFlight("end");
       }, 50);
       flight = f; draw();
+      // 本番の scene.js と同じく、開始直後に1回 HUD を更新する
+      const first = infoAt(cohort, 0); f.year = first.year; f.age = first.age;
+      onProgress?.(first);
     },
     stopFlight() { endFlight("stop"); },
     onPick(cb) { pickCb = cb; },
