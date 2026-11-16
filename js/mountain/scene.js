@@ -643,8 +643,8 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     },
     /** ids: 強調する世代の id の配列（'dankai','hinoeuma','dankai-jr','postwar'）。'all' も可 */
     setHighlight(ids) {
-      const list = ids === 'all' ? [...COHORT_IDS] : (ids || []).filter(id => COHORT_IDS.includes(id));
-      state.highlight = COHORT_IDS.filter(id => list.includes(id));
+      // getState() には渡された配列をそのまま返す（描画には既知の id だけを使う）
+      state.highlight = ids === 'all' ? [...COHORT_IDS] : [...(ids || [])];
       applyHighlight();
       if (effCut() != null) rebuildCut();
       requestRender();
