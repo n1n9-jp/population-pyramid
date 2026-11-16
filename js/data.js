@@ -10,7 +10,7 @@ export async function loadData(useFixture) {
     res = await fetch(url);
   } catch (e) {
     const hint = location.protocol === "file:"
-      ? "file:// で開くとデータを読めません。リポジトリ直下で python3 -m http.server 8000 を実行し、http://localhost:8000/ を開いてください。"
+      ? "file:// で開くとデータを読めません。リポジトリ直下で python3 -m http.server 8000 を実行し、http://localhost:8000/national.html を開いてください。"
       : "ネットワーク接続を確認してください。";
     throw new Error(`データ（${url}）を読み込めませんでした。${hint}`);
   }

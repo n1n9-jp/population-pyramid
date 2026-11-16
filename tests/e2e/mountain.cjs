@@ -1,5 +1,5 @@
 'use strict';
-// 3Dページ「人口の山脈とコホートの糸」（mountain.html）の E2E テスト。仕様は docs/MOUNTAIN.md §4〜§7。
+// 3Dページ「人口の山脈とコホートの糸」（/ = index.html）の E2E テスト。仕様は docs/MOUNTAIN.md §4〜§7。
 // 使い方: node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--stub] [--out DIR]
 // --stub は ?stub=1（scene-stub.js）で開く。3D 描画は検査せず、状態・UI・ツールチップだけを検査する。
 const path = require('path');
@@ -61,7 +61,7 @@ function url(q, noStub) {
   if (args.fixture) parts.push('fixture=1');
   if (args.stub && !noStub) parts.push('stub=1');
   if (q) parts.push(q);
-  return `${args.base}/mountain.html${parts.length ? '?' + parts.join('&') : ''}`;
+  return `${args.base}/${parts.length ? '?' + parts.join('&') : ''}`;
 }
 
 async function openPage(browser, opts, label, extra, { record = true, init, waitReady = true, noStub = false } = {}) {
@@ -753,8 +753,11 @@ async function main() {
         if (await dp.locator(sel).count() === 0) bad.push(`${sel} が見つからない`);
       }
       const links = await dp.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')));
-      if (!links.some((h) => /(^|\/)index\.html(\?|#|$)/.test(h))) bad.push(`全国ページ(index.html)へのリンクなし: ${JSON.stringify(links)}`);
-      if (!links.some((h) => /(^|\/)regions\.html(\?|#|$)/.test(h))) bad.push(`地域別ページ(regions.html)へのリンクなし: ${JSON.stringify(links)}`);
+      const hidden = links.filter((h) => /(^|\/)(national|regions)\.html(\?|#|$)/.test(h));
+      if (hidden.length) bad.push(`3Dページに national.html / regions.html へのリンクがある: ${JSON.stringify(hidden)}`);
+      if (await dp.locator('.page-nav').count() !== 0) bad.push('3Dページに .page-nav が残っている');
+      const robots = await dp.$$eval('meta[name="robots"]', (ms) => ms.map((m) => m.content));
+      if (robots.some((c) => /noindex/i.test(c))) bad.push(`3Dページに noindex がある: ${JSON.stringify(robots)}`);
       assert(bad.length === 0, bad.join('\n'));
     });
 
@@ -845,27 +848,35 @@ async function main() {
       assert((await getState(dp)).camera === 'free', 'camera が free でない');
     });
 
-    await check('11f. 375px：.page-nav のリンクが折り返しても「→」だけが落ちない（nowrap）', async () => {
-      const ws = await mp.$$eval('.page-nav a', (as) => as.map((a) => getComputedStyle(a).whiteSpace));
-      assert(ws.length >= 2 && ws.every((w) => w === 'nowrap'), `white-space=${JSON.stringify(ws)}`);
-    });
-
     await m.ctx.close();
     await d.ctx.close();
 
     // ---- 10: 他ページからのリンク ----
-    await check('10. index.html と regions.html の .page-nav に mountain.html へのリンクがある', async () => {
+    await check('10. 2Dの2ページは ./ へ戻るリンクだけを持ち、noindex。/mountain.html は / へ転送する', async () => {
       const ctx = await browser.newContext(DESKTOP_REDUCED);
       const pg = await ctx.newPage();
       const bad = [];
       try {
-        for (const file of ['index.html', 'regions.html']) {
+        for (const file of ['national.html', 'regions.html']) {
           await pg.goto(`${args.base}/${file}`, { waitUntil: 'load' });
-          const hrefs = await pg.$$eval('.page-nav a[href]', (as) => as.map((a) => [a.getAttribute('href'), (a.textContent || '').trim()]));
-          const hit = hrefs.find(([h]) => /(^|\/)mountain\.html(\?|#|$)/.test(h));
-          if (!hit) bad.push(`${file}: .page-nav に mountain.html へのリンクなし ${JSON.stringify(hrefs)}`);
-          else if (!hit[1].includes('3D')) bad.push(`${file}: リンク文言=${JSON.stringify(hit[1])}（「3Dで見る →」を期待）`);
+          const hrefs = await pg.$$eval('.page-nav a[href]', (as) => as.map((a) => a.getAttribute('href')));
+          if (hrefs.length !== 1 || hrefs[0] !== './') bad.push(`${file}: .page-nav が ["./"] だけではない ${JSON.stringify(hrefs)}`);
+          const all = await pg.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')));
+          const other = all.filter((h) => /(^|\/)(index|national|regions|mountain)\.html(\?|#|$)/.test(h));
+          if (other.length) bad.push(`${file}: 他ページへのリンクがある ${JSON.stringify(other)}`);
+          const robots = await pg.$$eval('meta[name="robots"]', (ms) => ms.map((m) => m.content));
+          if (!robots.some((c) => /noindex/i.test(c))) bad.push(`${file}: noindex がない`);
         }
+        await pg.goto(`${args.base}/`, { waitUntil: 'load' });
+        const robots = await pg.$$eval('meta[name="robots"]', (ms) => ms.map((m) => m.content));
+        if (robots.length) bad.push(`/: robots メタがある ${JSON.stringify(robots)}`);
+        const canon = await pg.$$eval('link[rel="canonical"]', (ls) => ls.map((l) => l.href));
+        if (canon.join() !== 'https://population-pyramid.structure-and-representation.com/') bad.push(`/: canonical=${JSON.stringify(canon)}`);
+        await pg.goto(`${args.base}/mountain.html?step=free&fixture=1`, { waitUntil: 'load' });
+        await pg.waitForURL((u) => !/mountain\.html/.test(u.pathname), { timeout: 10000 });
+        const u = new URL(pg.url());
+        if (u.pathname !== '/') bad.push(`/mountain.html の転送先 pathname=${u.pathname}`);
+        if (u.searchParams.get('step') !== 'free' || u.searchParams.get('fixture') !== '1') bad.push(`クエリが引き継がれない: ${u.search}`);
       } finally { await ctx.close(); }
       assert(bad.length === 0, bad.join('\n'));
     });

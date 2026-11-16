@@ -53,7 +53,7 @@ async function openPage(browser, opts, label, extra) {
   const q = [];
   if (args.fixture) q.push('fixture=1');
   if (extra) q.push(extra);
-  await page.goto(`${args.base}/${q.length ? '?' + q.join('&') : ''}`, { waitUntil: 'load' });
+  await page.goto(`${args.base}/national.html${q.length ? '?' + q.join('&') : ''}`, { waitUntil: 'load' });
   await page.waitForSelector('body[data-ready="true"]', { timeout: 20000 });
   return { ctx, page, mine };
 }
@@ -437,13 +437,13 @@ async function main() {
       });
       const f = await browser.newContext(DESKTOP); const fp = await f.newPage();
       try {
-        await fp.goto(`${args.base}/?fixture=1`, { waitUntil: 'load' });
+        await fp.goto(`${args.base}/national.html?fixture=1`, { waitUntil: 'load' });
         await fp.waitForSelector('body[data-ready="true"]', { timeout: 20000 });
         assert(await shown(fp), '?fixture=1 で帯が表示されない');
       } finally { await f.close(); }
       const n = await browser.newContext(DESKTOP); const np = await n.newPage();
       try {
-        await np.goto(`${args.base}/`, { waitUntil: 'load' });
+        await np.goto(`${args.base}/national.html`, { waitUntil: 'load' });
         // data/pyramid.json が未生成なら本番データを読めない。その場合は帯が出ないことだけ確認する。
         const prodOk = (await np.request.get(`${args.base}/data/pyramid.json`)).ok();
         if (prodOk) {

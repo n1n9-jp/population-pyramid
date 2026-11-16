@@ -1,6 +1,6 @@
 # 3Dページ「人口の山脈とコホートの糸」の契約（全担当が参照する）
 
-全国ページ（index.html）と地域別ページ（regions.html）は残す。新しく `mountain.html` を作り、全国の各歳別人口を3Dで見せる。見た目の基準は、docs/mocks/3d/ の静止画モック（01〜08）と、その元になった mock.html。色は男女の色（モック01）を使う。
+公開の入口は、この3Dページ（`index.html`）にする。全国ページ（national.html）と地域別ページ（regions.html）は残すが、3Dページからはリンクせず、noindex にして、URLを直接開いた人だけが見られるようにする。旧 `mountain.html` は `/` への転送ページにする。この3Dページで、全国の各歳別人口を3Dで見せる。見た目の基準は、docs/mocks/3d/ の静止画モック（01〜08）と、その元になった mock.html。色は男女の色（モック01）を使う。
 
 Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newton-grgdly`。所有パスだけを add し、pull --rebase してから push する。force push はしない。
 
@@ -62,12 +62,12 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
       - reducedMotion のときは飛ばない。経路の中ほどの視点を表示し、onEnd をすぐ呼ぶ。
     - 各プリセットは、見せる範囲と、その近くの目盛りの文字がキャンバスに収まる距離に置く。文字はキャンバスの端で切れるときと、優先度の高い文字に重なるときは出さない。
   - js/mountain/geometry.js など、補助のファイルは自由に分けてよい。
-- **js/mountain/{main,tour,ui,inset}.js、mountain.html、css/mountain.css**（M2）
+- **js/mountain/{main,tour,ui,inset}.js、index.html、css/mountain.css**（M2）
   - scene の API だけを使う。scene の中には手を入れない。
 - three.js は `three@0.160.0`。jsdelivr から importmap で読み込む（mock.html と同じ書き方）。
 - ビルド工程は持たない。
 
-## 5. ページとツアー（mountain.html）
+## 5. ページとツアー（index.html）
 - 左（狭い画面では上）に固定の canvas、右（狭い画面では下）にスクロールで進む解説の段落を置く（モック08）。
 - 段落 `.scene-step[data-step]` が画面に入ると、IntersectionObserver でカメラと形を切り替える。各段の設定は次のとおり。
 
@@ -108,8 +108,8 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
 - **reduced motion**：変形もカメラの移動もしない。各段では最終の状態をそのまま表示する。
 - **補助**
   - データ表を `<details>` に入れる。中身は、断面の年の各歳と男女の人数。全国ページと同じ形式（年齢は `th scope=row`、値のない所は「—」、全行を表示し、閉じている間は描かない）。
-  - 全国ページと地域別ページへのリンクを置く。
-  - index.html と regions.html の `.page-nav` に「3Dで見る →」を1行ずつ足す。ほかの部分は変えない。
+  - 全国ページと地域別ページへのリンクは置かない。
+  - national.html と regions.html の `.page-nav` は「← 人口の山脈（3D）へ」（href="./"）の1本だけにする。
 - **URL**：`?step=<data-step>` を付けて開くと、その段にスクロールした状態で始まる。
 
 ## 6. E2E との約束
@@ -119,6 +119,6 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
 - §5 に出てくる id とクラス。
 
 ## 7. 実行コマンド
-- `python3 -m http.server 8000` を起動して `http://localhost:8000/mountain.html` を開く。
+- `python3 -m http.server 8000` を起動して `http://localhost:8000/` を開く。
 - E2E：`node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--stub] [--out DIR]`（`--stub` は `?stub=1` の仮実装で開く）。WebGL が要るので、chromium は `--use-gl=swiftshader --enable-unsafe-swiftshader` を付けて起動する（docs/mocks/3d/shoot.js を参照）。
 - smoke.cjs と regions.cjs も合格のままにすること。

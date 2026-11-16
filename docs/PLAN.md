@@ -89,7 +89,7 @@ lt1920 パーサは 2000 年も返してよい（merge で lt2000 を優先）�
 
 ## 4. フロントエンド
 
-ファイル：`index.html`, `css/*.css`, `js/*.js`（ES modules、`<script type="module">`）。`data/pyramid.json` を fetch。URL に `?fixture=1` があれば `tests/fixtures/pyramid.fixture.json` を読む（このとき「サンプルデータ」の帯を出す）。
+ファイル：`national.html`（当初は index.html。現在の index.html は3Dページ）, `css/*.css`, `js/*.js`（ES modules、`<script type="module">`）。`data/pyramid.json` を fetch。URL に `?fixture=1` があれば `tests/fixtures/pyramid.fixture.json` を読む（このとき「サンプルデータ」の帯を出す）。
 
 表示仕様：
 - 101行（100歳が最上段）。男性左・女性右、中央に年齢欄。年齢ラベル・横グリッドは5歳ごと（狭い画面は10歳ごと）。横軸は片側 0〜xMaxPerSex 固定、ラベル「0, 50, 100, 150」、中央に「人口（万人）」。
