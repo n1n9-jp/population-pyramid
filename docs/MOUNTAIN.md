@@ -43,10 +43,15 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
     - `setHighlight(ids[])`
     - `setOrbit(enabled)`
     - `resize(w, h)`
+    - `resetView({animate})`：視点を今の段の既定に戻す。free では、今の形を見るための既定の視点（地形型は overview、ピラミッド型は斜めから全体）へ移す。ボタンはページ側が付ける。
     - `getState()`：`{form, camera, cutYear, highlight}` を返す
-    - `onPick(cb)`
+    - `onPick(cb)`：`cb(result|null, {type:'hover'|'tap', x, y})`。ホバー（マウス）で出したものは、ポインタが canvas から出ると `null` で消す。タップで出したものは、次のタップまで残す（何もない所をタップすると `cb(null, {type:'tap'})`）。タッチの pointerleave では消さない。
     - `dispose()`
   - カメラのプリセット：`overview`、`war`、`dankai`、`hinoeuma`、`dankai-jr`、`cut2025`、`pyramid-front`、`free`。
+    - free の段で `setForm` を呼ぶと、その形を見るための既定の視点へなめらかに移る（`resetView` と同じ行き先）。free で canvas を触ると、移動をやめて操作に従う。
+    - 断面より奥の年を淡くする処理と、奥の年を通る糸を隠す処理は、カメラの名前ではなく「form が pyramid で、正面（z 軸の向き）に近い視線」のときに掛ける。free で正面から見た場合も同じ。
+    - 世代を追う段（war・dankai・hinoeuma・dankai-jr）では、主役の糸が谷の底で手前の尾根に隠れないよう、強調の糸を面より手前に描く。
+    - 各プリセットは、見せる範囲と、その近くの目盛りの文字がキャンバスに収まる距離に置く。文字はキャンバスの端で切れるときと、優先度の高い文字に重なるときは出さない。
   - js/mountain/geometry.js など、補助のファイルは自由に分けてよい。
 - **js/mountain/{main,tour,ui,inset}.js、mountain.html、css/mountain.css**（M2）
   - scene の API だけを使う。scene の中には手を入れない。

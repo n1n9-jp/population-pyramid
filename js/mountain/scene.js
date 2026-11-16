@@ -19,32 +19,38 @@ export { COHORT_IDS };
 const FORM_MS = 700, CAM_MS = 900;
 const ORTHO_EQ_FOV = 6;            // 正射影へ切り替える直前の、ほぼ平行な透視投影の画角
 const NO_CUT = 1e6;
-const TIGHT_MARGIN = 0.94;       // overview：外形の投影がキャンバスの幅か高さのこの割合を占める
+const FRONT_DOT = [0.9, 0.97];   // ピラミッド型を正面に近い向きで見ているとみなす、視線と z 軸の内積の範囲
+const clamp01 = v => Math.max(0, Math.min(1, v));
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /* ---------------------------------------------------------------- カメラのプリセット */
 // fitR：この半径の球が画面に収まる距離に置く（縦長の画面でも切れないように）。
 // 正射影は view（縦の範囲）と fitW（横に必要な範囲）で決める。
+// box：画面に収める範囲。'all' は内容の外形すべて（目盛りの文字も含む）。
+// 範囲を指定したプリセットは、その範囲と、範囲の近くにある目盛りの文字が収まる距離に置く。
 function presetTable(M) {
-  const TX = M.TX, PZ = M.PZ;
+  const TX = M.TX, PZ = M.PZ, H = M.TH(M.vmax), zb = M.TZ('female', 0), zf = M.TZ('male', 0);
+  const years = (y0, y1, z0 = zb, z1 = zf) => [[TX(y0), TX(y1)], [0, H], [z0, z1]];
   return {
     terrain: {
-      overview: { target: [0, 1.2, 1.0], dir: [-0.26, 0.72, 0.64], fov: 33, fitR: 13.1, fitBox: true, tight: true },
-      war: { target: [-5.5, 1.0, 0], dir: [-0.6, 0.55, 0.58], fov: 33, fitR: 9.4 },
-      dankai: { target: [3.0, 1.2, 4.0], dir: [-0.42, 0.6, 0.68], fov: 33, fitR: 9.7 },
-      hinoeuma: { target: [4.2, 1.2, 6.0], dir: [-0.36, 0.62, 0.7], fov: 33, fitR: 8.6 },
-      'dankai-jr': { target: [5.6, 1.4, 6.6], dir: [-0.18, 0.62, 0.76], fov: 33, fitR: 8.4 },
-      cut2025: { target: [TX(2025) - 2.5, 2.0, 0], dir: [0.8, 0.46, 0.52], fov: 33, fitR: 10.2, fitBox: true, quiet: true },
+      overview: { target: [0, 1.2, 1.0], dir: [-0.26, 0.72, 0.64], fov: 33, box: 'all', margin: 0.94 },
+      // 世代を追う段（onTop）：主役の糸は谷の底を通り、手前の尾根に隠れるので、面より手前に描く
+      war: { target: [TX(1948), 1.0, 0], dir: [-0.6, 0.55, 0.58], fov: 33, box: years(1930, 1985), margin: 0.98, onTop: true },
+      dankai: { target: [3.0, 1.2, 4.0], dir: [-0.42, 0.6, 0.68], fov: 33, box: years(1950, 2025, 0, zf), margin: 0.98, onTop: true },
+      // 丙午の谷は年が進むほど年齢が上がる斜めの向きに走るので、1966年の側から谷に沿って斜め上に見下ろす
+      hinoeuma: { target: [4.5, 1.2, 6.0], dir: [-0.6, 0.76, 0.4], fov: 33, box: years(1964, 2025, 0, zf), margin: 0.98, onTop: true },
+      'dankai-jr': { target: [5.6, 1.4, 6.6], dir: [-0.18, 0.62, 0.76], fov: 33, box: years(1970, 2025, 0, zf), margin: 0.98, onTop: true },
+      cut2025: { target: [TX(2025) - 2.5, 2.0, 0], dir: [0.8, 0.46, 0.52], fov: 33, box: 'all', margin: 0.96, quiet: true },
       'pyramid-front': { ortho: true, target: cut => [TX(cut), 3.6, 0], dir: [1, 0, 0], view: 9.0, fitW: 22.5, quiet: true },
     },
     pyramid: {
-      overview: { target: [0, 4.8, -1.0], dir: [-0.62, 0.34, 0.72], fov: 30, fitR: 11.4, fitBox: true, tight: true },
+      overview: { target: [0, 4.8, -1.0], dir: [-0.62, 0.34, 0.72], fov: 30, box: 'all', margin: 0.94 },
       war: { target: [0, 3.9, PZ(1950)], dir: [-0.72, 0.32, 0.62], fov: 30, fitR: 11.2 },
       dankai: { target: [0, 4.6, PZ(1985)], dir: [-0.66, 0.32, 0.68], fov: 30, fitR: 9.4 },
       hinoeuma: { target: [0, 4.0, PZ(1995)], dir: [-0.64, 0.3, 0.7], fov: 30, fitR: 8.8 },
       'dankai-jr': { target: [0, 3.8, PZ(2000)], dir: [-0.6, 0.3, 0.74], fov: 30, fitR: 8.8 },
-      cut2025: { target: [0, 5.0, PZ(2025) - 3], dir: [-0.45, 0.28, 0.85], fov: 30, fitR: 10.5, fitBox: true },
-      'pyramid-front': { ortho: true, target: cut => [0, 5.3, PZ(cut)], dir: [0, 0, 1], view: 13.4, fitW: 16.2 },
+      cut2025: { target: [0, 5.0, PZ(2025) - 3], dir: [-0.45, 0.28, 0.85], fov: 30, box: 'all', margin: 0.96 },
+      'pyramid-front': { ortho: true, target: cut => [0, 5.3, PZ(cut)], dir: [0, 0, 1], box: 'front', margin: 0.94 },
     },
   };
 }
@@ -88,11 +94,13 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
 
   /* ---- three 基本 ---- */
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0xffffff, 1);
   renderer.localClippingEnabled = true;
   let W = Math.max(1, canvas.clientWidth || canvas.width || 300);
   let H = Math.max(1, canvas.clientHeight || canvas.height || 150);
+  // 狭い画面（幅 600px 未満）は描画の負荷を下げるため、pixelRatio の上限を 1.5 にする
+  const pixelRatio = () => Math.min(window.devicePixelRatio || 1, W < 600 ? 1.5 : 2);
+  renderer.setPixelRatio(pixelRatio());
   renderer.setSize(W, H, false);
 
   const scene = new THREE.Scene();
@@ -245,8 +253,12 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, 0.004, z); group.add(mesh);
   }
   const labels = new LabelSet(); scene.add(labels.group);
-  const tick = { size: 10.5, color: '#777' }, axName = { size: 12, color: '#333', weight: 700 };
-  const mLab = { size: 11.5, color: COLORS.maleStrong, weight: 700 }, fLab = { size: 11.5, color: COLORS.femaleStrong, weight: 700 };
+  // 文字が重なるときは priority の高いものを残す（labels.js）
+  const tick = { size: 10.5, color: '#6b6b6b' }, tickEnd = { ...tick, priority: 1 };
+  const axName = { size: 12, color: '#333', weight: 700, priority: 2 };
+  // 面のラベルは面の後ろに隠れないよう、手前に描く
+  const mLab = { size: 11.5, color: COLORS.maleStrong, weight: 700, priority: 3, onTop: true };
+  const fLab = { size: 11.5, color: COLORS.femaleStrong, weight: 700, priority: 3, onTop: true };
   const depthTicks = [], terrainTicks = [];   // 正面から見ると重なる、奥行き（年）の目盛り
   const gaps = [];
   for (let i = 0; i + 1 < M.years.length; i++) if (!M.consecutive(i)) gaps.push([M.years[i].year, M.years[i + 1].year]);
@@ -268,13 +280,13 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     const hx = x1, vs = [V(hx, 0, zf), V(hx, TH(M.vmax), zf)];
     for (const v of vTicks) vs.push(V(hx, TH(v), zf), V(hx + 0.25, TH(v), zf));
     thin(axesT, 'T', vs, 0x999999);
-    for (let yr = Math.ceil(M.yMin / 20) * 20; yr < M.yMax - 4; yr += 20) labels.add(String(yr), [TX(yr), 0, zf + 0.9], null, tick);
-    labels.add(String(M.yMax), [x1, 0, zf + 0.9], null, tick);
+    for (let yr = Math.ceil(M.yMin / 20) * 20; yr < M.yMax - 4; yr += 20) labels.add(String(yr), [TX(yr), 0, zf + 0.9], null, yr === M.yMin ? tickEnd : tick);
+    labels.add(String(M.yMax), [x1, 0, zf + 0.9], null, tickEnd);
     labels.add('年 →', [0, 0, zf + 2.0], null, axName);
-    for (const a of [0, 20, 40, 60, 80]) for (const s of SEXES) labels.add(`${a}歳`, [x0 - 0.9, 0, TZ(s, a)], null, tick);
-    labels.add(`${M.ageMax}歳`, [x0 - 0.9, 0, 0], null, tick);
+    for (const a of [0, 20, 40, 60, 80]) for (const s of SEXES) labels.add(`${a}歳`, [x0 - 0.9, 0, TZ(s, a)], null, a ? tick : tickEnd);
+    labels.add(`${M.ageMax}歳`, [x0 - 0.9, 0, 0], null, tickEnd);
     labels.add('年齢', [x0 - 2.4, 0, 5.2], null, axName); labels.add('年齢', [x0 - 2.4, 0, -5.2], null, axName);
-    for (const v of vTicks) labels.add(v ? `${v / 10000}万人` : '0', [hx + 1.3, TH(v), zf], null, tick);
+    for (const v of vTicks) labels.add(v ? `${v / 10000}万人` : '0', [hx + 1.3, TH(v), zf], null, v ? tick : tickEnd);
     labels.add('人数（各歳）', [hx + 1.3, TH(M.vmax) + 0.9, zf], null, axName);
     labels.add('◀ 男性の面', [x0 + 0.9, 0.1, 7.2], null, mLab);
     labels.add('◀ 女性の面', [x0 + 0.9, 0.1, -7.2], null, fLab);
@@ -297,16 +309,16 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     thin(axesPFront, 'P', fs, 0x777777, 0.22);
     thin(axesPFront, 'P', fs0, 0x777777, 0.8);
     const F = { ...tick, front: true }, FA = { ...axName, front: true };
-    for (const a of [0, 20, 40, 60, 80, 100]) labels.add(`${a}歳`, null, [-xw - 0.85, PY(a), zf], F);
+    for (const a of [0, 20, 40, 60, 80, 100]) labels.add(`${a}歳`, null, [-xw - 0.85, PY(a), zf], a % 100 ? F : { ...F, priority: 1 });
     for (const v of vTicks) for (const s of [-1, 1]) if (v || s > 0) labels.add(vLabel(v), null, [s * PX(v), -0.5, zf], F);
     labels.add('人数（各歳）', null, [0, -1.15, zf], FA);
-    labels.add('年齢', null, [-xw - 1.9, PY(50), zf], FA);
+    labels.add('年齢', null, [-xw - 1.75, PY(50), zf], FA);
     labels.add('◀ 男性', null, [-xw * 0.6, PY(M.ageMax) + 0.55, zf], { ...mLab, front: true });
     labels.add('女性 ▶', null, [xw * 0.6, PY(M.ageMax) + 0.55, zf], { ...fLab, front: true });
     for (const yr of [M.yMin, 1950, 1980].filter(y => y > M.yMin - 1 && y < M.yMax - 10)) depthTicks.push(labels.add(String(yr), null, [-xw - 1.0, 0, PZ(yr)], tick));
     depthTicks.push(labels.add('年（奥ほど過去）', null, [-xw - 2.6, 0, (z0 + zf) / 2 - 2], axName));
   }
-  const cutLabel = labels.add('断面', [0, 0, 0], [0, 0, 0], { size: 12, color: '#445', weight: 700, onTop: true });
+  const cutLabel = labels.add('断面', [0, 0, 0], [0, 0, 0], { size: 12, color: '#445', weight: 700, onTop: true, priority: 4 });
   cutLabel.hidden = true;
 
   /* ---- 断面 ---- */
@@ -378,27 +390,43 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
   function updateCutUniforms() {
     const yr = effCut();
     U.uCut.value = yr == null ? NO_CUT : yr;
-    U.uPast.value = state.camera === 'pyramid-front' ? 0.8 : 0;
     // 補間の途中では、近い方の形の向きで切る
     if (yr == null) { clipPlane.normal.set(-1, 0, 0); clipPlane.constant = NO_CUT; }
     else if (formT < 0.5) { clipPlane.normal.set(-1, 0, 0); clipPlane.constant = M.TX(yr) + 0.005; }
     else { clipPlane.normal.set(0, 0, -1); clipPlane.constant = M.PZ(yr) + 0.005; }
     const ghost = yr != null && yr < M.yMax;
     for (const sex of SEXES) { surfaces[sex].ghost.visible = ghost; surfaces[sex].wallGhost.visible = ghost; }
-    front.intensity = state.camera === 'pyramid-front' ? 0.5 : 0;
+  }
+  /**
+   * ピラミッド型を正面に近い向きで見ているときは、断面より奥（過去）の面を淡くし、奥の年を通る糸を隠す。
+   * カメラのプリセット名ではなく、形と視線の向きで決める（free で正面から見た場合も同じ扱い）。
+   */
+  let frontK = 0, isFront = false;
+  function updateFront() {
+    const dz = tmpV.copy(camera.position).sub(controls.target).normalize().z;
+    frontK = clamp01((dz - FRONT_DOT[0]) / (FRONT_DOT[1] - FRONT_DOT[0])) * clamp01((formT - 0.5) * 2);
+    U.uPast.value = effCut() != null ? 0.8 * frontK : 0;
+    front.intensity = 0.5 * frontK;
+    const f = frontK > 0.5;
+    if (f !== isFront) { isFront = f; applyHighlight(); }
   }
 
   /* ---- 表示の更新 ---- */
   function applyHighlight() {
-    // 正面（pyramid-front）では、奥の年を通る糸は描かない
-    const front = state.camera === 'pyramid-front';
+    // ピラミッド型を正面から見ているときは、奥の年を通る糸は描かない
+    const front = isFront;
     const on = new Set(state.highlight);
-    for (const c of COHORTS) for (const o of cohortThreads[c.id]) o.visible = !front && on.has(c.id);
+    const top = threadsOnTop();
+    for (const c of COHORTS) for (const o of cohortThreads[c.id]) {
+      o.visible = !front && on.has(c.id);
+      o.material.depthTest = !top; o.renderOrder = top ? 9 : 5;
+    }
     for (const o of baseThreads) o.visible = !front;
     for (const l of depthTicks) l.hidden = front;
     const quiet = !!(PRE.terrain[state.camera] || {}).quiet;
     for (const l of terrainTicks) l.hidden = quiet;
   }
+  const threadsOnTop = () => state.form === 'terrain' && !!(PRE.terrain[state.camera] || {}).onTop;
   function applyForm() {
     const t = formT;
     const wT = Math.max(0, 1 - t * 2), wP = Math.max(0, t * 2 - 1);
@@ -418,50 +446,88 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     const dir = new THREE.Vector3(...p.dir).normalize();
     const asp = W / H;
     if (p.ortho) {
+      if (p.box) {
+        const half = fitView(fitPoints(name, form, p, cut), target, dir, false, 1, asp, p.margin);
+        return { ortho: true, target, dir, viewH: half * 2, dist: 60 };
+      }
       const viewH = Math.max(p.view, p.fitW / asp);
       return { ortho: true, target, dir, viewH, dist: 60 };
     }
     const vf = THREE.MathUtils.degToRad(p.fov) / 2, hf = Math.atan(Math.tan(vf) * asp);
-    let dist = p.fitR / Math.sin(Math.min(vf, hf));
-    if (p.tight) {
-      // 内容の外形の投影が画面に収まる距離を求め、投影の中心が画面の中心に来るよう注視点を動かす
-      const tv = Math.tan(vf), th = Math.tan(hf);
-      for (let i = 0; i < 4; i++) {
-        dist = boxDist(CONTENT[form], target, dir, tv, th, TIGHT_MARGIN);
-        boxCenterShift(CONTENT[form], target, dir, dist, tv, th);
-      }
-      dist = boxDist(CONTENT[form], target, dir, tv, th, TIGHT_MARGIN);
-    } else if (p.fitBox) dist = Math.max(dist * 0.85, boxDist(CONTENT[form], target, dir, Math.tan(vf), Math.tan(hf)));
-    return { ortho: false, target, dir, fov: p.fov, dist };
-  }
-  // 内容（面・軸・目盛り）の外形。俯瞰のプリセットは、これが画面に収まる距離に置く
-  const CONTENT = {
-    terrain: [[M.TX(M.yMin) - 2.0, M.TX(M.yMax) + 2.8], [0, M.TH(M.vmax) + 1.0], [M.TZ('female', 0) - 0.3, M.TZ('male', 0) + 2.2]],
-    pyramid: [[-M.PX(M.vmax) - 2.4, M.PX(M.vmax) + 0.6], [-1.4, M.PY(M.ageMax) + 1.4], [M.PZ(M.yMin), M.PZ(M.yMax) + 0.5]],
-  };
-  function boxDist(box, target, dir, tanV, tanH, margin = 0.94) {
-    const f = dir.clone(), r = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), f).normalize();
-    const u = new THREE.Vector3().crossVectors(f, r);
-    let d = 0;
-    for (const x of box[0]) for (const y of box[1]) for (const z of box[2]) {
-      const q = tmpV.set(x, y, z).sub(target);
-      const cx = Math.abs(q.dot(r)), cy = Math.abs(q.dot(u)), cz = q.dot(f);
-      d = Math.max(d, cz + cx / (tanH * margin), cz + cy / (tanV * margin));
+    if (p.box) {
+      // 範囲（と目盛りの文字）の投影が画面に収まる距離を求め、投影の中心が画面の中心に来るよう注視点を動かす
+      const dist = fitView(fitPoints(name, form, p, cut), target, dir, true, Math.tan(vf), Math.tan(hf), p.margin);
+      return { ortho: false, target, dir, fov: p.fov, dist };
     }
-    return d;
+    return { ortho: false, target, dir, fov: p.fov, dist: p.fitR / Math.sin(Math.min(vf, hf)) };
   }
-  // 外形の投影の中心を画面中央へ寄せる（target を画面平面内で動かす）
-  function boxCenterShift(box, target, dir, dist, tanV, tanH) {
+  // 内容（面・軸・目盛り）の外形
+  const CONTENT = {
+    terrain: [[M.TX(M.yMin), M.TX(M.yMax)], [0, M.TH(M.vmax)], [M.TZ('female', 0), M.TZ('male', 0)]],
+    pyramid: [[-M.PX(M.vmax), M.PX(M.vmax)], [0, M.PY(M.ageMax)], [M.PZ(M.yMin), M.PZ(M.yMax)]],
+  };
+  const labelScale = () => Math.max(0.8, Math.min(1, W / 640));
+  /**
+   * 画面に収める点の一覧：範囲の角（大きさ 0）と、その形で出る文字（文字の大きさを px で持つ）。
+   * 範囲を指定したプリセットでは、範囲の近くにある文字だけを含める。
+   */
+  function fitPoints(name, form, p, cut) {
+    const t = form === 'pyramid' ? 1 : 0;
+    let box;
+    if (p.box === 'front') {
+      const xw = M.PX(M.vmax), z = M.PZ(cut);
+      box = [[-xw, xw], [0, M.PY(M.ageMax)], [z, z]];
+    } else box = p.box === 'all' ? CONTENT[form] : p.box;
+    const pts = [];
+    for (const x of box[0]) for (const y of box[1]) for (const z of box[2]) pts.push({ p: [x, y, z], hx: 0, hy: 0 });
+    const quiet = form === 'terrain' && !!(PRE.terrain[name] || {}).quiet;
+    const offB = cut != null ? M.PZ(cut) - M.PZ(M.yMax) : 0;
+    const pad = 1.8, k = labelScale() / 2;
+    for (const it of labels.items) {
+      const pos = t ? it.posB : it.posA;
+      if (!pos) continue;
+      if (it === cutLabel && cutLabel.hidden) continue;
+      if (quiet && terrainTicks.includes(it)) continue;
+      if (t && p.box === 'front' && !it.style.front && it !== cutLabel) continue;
+      if (t && name === 'pyramid-front' && depthTicks.includes(it)) continue;
+      const q = [pos[0], pos[1], pos[2] + (t && it.style.front ? offB : 0)];
+      if (p.box !== 'all' && p.box !== 'front' && !q.every((v, i) => v >= box[i][0] - pad && v <= box[i][1] + pad)) continue;
+      pts.push({ p: q, hx: it.pxW * k, hy: it.pxH * k });
+    }
+    return pts;
+  }
+  /**
+   * 点の一覧の投影が、画面の幅と高さの margin 倍に収まる大きさを求める。target は投影の中心が画面中央に来るよう動かす。
+   * 透視投影なら距離、正射影なら縦の半分の大きさを返す（どちらも大きいほど小さく映る）。
+   */
+  function fitView(pts, target, dir, persp, tanV, tanH, margin = 0.94) {
     const f = dir, r = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), f).normalize();
     const u = new THREE.Vector3().crossVectors(f, r);
-    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-    for (const x of box[0]) for (const y of box[1]) for (const z of box[2]) {
-      const q = tmpV.set(x, y, z).sub(target), dep = dist - q.dot(f);
-      const nx = q.dot(r) / (dep * tanH), ny = q.dot(u) / (dep * tanV);
-      x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny);
+    const ext = s => {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const pt of pts) {
+        const q = tmpV.set(pt.p[0], pt.p[1], pt.p[2]).sub(target);
+        const dep = persp ? s - q.dot(f) : s;
+        if (dep <= 0.05) return null;
+        const nx = q.dot(r) / (dep * tanH), ny = q.dot(u) / (dep * tanV);
+        const ex = pt.hx * 2 / W, ey = pt.hy * 2 / H;
+        x0 = Math.min(x0, nx - ex); x1 = Math.max(x1, nx + ex); y0 = Math.min(y0, ny - ey); y1 = Math.max(y1, ny + ey);
+      }
+      return { x0, x1, y0, y1 };
+    };
+    const fits = s => { const e = ext(s); return !!e && e.x1 - e.x0 <= 2 * margin && e.y1 - e.y0 <= 2 * margin; };
+    const search = () => {
+      let lo = 0.1, hi = 600;
+      for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
+      return hi;
+    };
+    let s = search();
+    for (let i = 0; i < 5; i++) {
+      const e = ext(s); if (!e) break;
+      target.addScaledVector(r, (e.x0 + e.x1) / 2 * s * tanH).addScaledVector(u, (e.y0 + e.y1) / 2 * s * tanV);
+      s = search();
     }
-    // 画面の端が ±1。中心のずれ分だけ、その奥行きで target を動かす
-    target.addScaledVector(r, (x0 + x1) / 2 * dist * tanH).addScaledVector(u, (y0 + y1) / 2 * dist * tanV);
+    return s;
   }
   /** 正射影の姿勢を、画角の小さい透視投影に置き換える（遷移のため） */
   function perspEquivalent(pose) {
@@ -496,21 +562,25 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     if (camera === cam) return;
     camera = cam; controls.object = cam;
   }
+  // 画角と距離を別々に補間すると、注視点で見える高さが縮んでから膨らむ。見える高さを補間し、距離はそこから決める
+  const viewHeight = p => 2 * p.dist * Math.tan(THREE.MathUtils.degToRad(p.fov) / 2);
   function lerpPose(a, b, t) {
     const dir = a.dir.clone().lerp(b.dir, t);
     if (dir.lengthSq() < 1e-6) dir.copy(b.dir); dir.normalize();
-    return {
-      ortho: false, target: a.target.clone().lerp(b.target, t), dir,
-      fov: a.fov + (b.fov - a.fov) * t, dist: Math.exp(Math.log(a.dist) + (Math.log(b.dist) - Math.log(a.dist)) * t),
-    };
+    const fov = a.fov + (b.fov - a.fov) * t;
+    const h = Math.exp(Math.log(viewHeight(a)) + (Math.log(viewHeight(b)) - Math.log(viewHeight(a))) * t);
+    return { ortho: false, target: a.target.clone().lerp(b.target, t), dir, fov, dist: h / (2 * Math.tan(THREE.MathUtils.degToRad(fov) / 2)) };
   }
   function moveCamera(name, animate) {
     if (name === 'free') return;
-    const to = presetPose(name, state.form); if (!to) return;
+    moveTo(presetPose(name, state.form), animate);
+  }
+  function moveTo(to, animate) {
+    if (!to) return;
     if (!animate || reducedMotion) { camAnim = null; setPose(to); requestRender(); return; }
     const from = perspEquivalent(currentPose());
     if (camera === ortho) setPose(from);
-    camAnim = { from, to, start: performance.now(), name };
+    camAnim = { from, to, start: performance.now() };
     requestRender();
   }
 
@@ -518,6 +588,7 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
   controls.enableDamping = false;
   controls.enabled = false;
   controls.addEventListener('change', () => requestRender());
+  controls.addEventListener('start', () => { camAnim = null; });   // free で触ったら、視点の移動をやめて操作に従う
 
   /* ---- 描画ループ（必要なときだけ描く） ---- */
   let raf = 0, disposed = false;
@@ -543,7 +614,8 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
   }
   function render() {
     const yr = effCut();
-    labels.update(formT, camera, H, yr == null ? 0 : M.PZ(yr) - M.PZ(M.yMax), Math.max(0.8, Math.min(1, W / 640)));
+    updateFront();
+    labels.update(formT, camera, W, H, yr == null ? 0 : M.PZ(yr) - M.PZ(M.yMax), labelScale());
     renderer.render(scene, camera);
   }
 
@@ -580,7 +652,8 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     let thr = null, best = Infinity;
     const lHits = raycaster.intersectObjects(lineObjs, false);
     for (const h of lHits) {
-      if (surf && h.distance > surf.hit.distance + 0.4) continue;   // 山の陰に隠れた糸は拾わない
+      // 山の陰に隠れた糸は拾わない（手前に描いている強調の糸は除く）
+      if (surf && h.distance > surf.hit.distance + 0.4 && !(h.object.userData.cohort && !h.object.material.depthTest)) continue;
       const meta = h.object.userData.meta[h.faceIndex], cur = h.object.userData.cur, o = h.faceIndex * 6;
       // 強調の糸を優先し、そのうえでレイに最も近い端点（年）を選ぶ
       const pri = h.object.userData.cohort ? 0 : 1e6;
@@ -610,14 +683,19 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       if (k !== lastHoverKey) { lastHoverKey = k; emit(res, { type: 'hover', ...screenOf(hoverEvt) }); }
     });
   };
-  const onLeave = () => { hoverEvt = null; if (lastHoverKey) { lastHoverKey = ''; emit(null, { type: 'hover' }); } };
+  // ホバーで出したものだけを、ポインタが出たときに消す。タッチでは指を離すと必ず pointerleave が来るので、
+  // タップで出したものは、次のタップ（何もない所なら cb(null, {type:'tap'})）で消す
+  const onLeave = e => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    hoverEvt = null; if (lastHoverKey) { lastHoverKey = ''; emit(null, { type: 'hover' }); }
+  };
   const onDown = e => { downAt = { x: e.clientX, y: e.clientY }; };
   const onUp = e => {
     if (!downAt) return;
     const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y); downAt = null;
     if (moved > 6) return;
     const res = pickAt(e.clientX, e.clientY);
-    lastHoverKey = keyOf(res);
+    if (!e.pointerType || e.pointerType === 'mouse') lastHoverKey = keyOf(res);
     emit(res, { type: 'tap', ...screenOf(e) });
   };
   canvas.addEventListener('pointermove', onMove);
@@ -637,10 +715,18 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       if (!FORMS.includes(form)) throw new Error('unknown form: ' + form);
       if (form === state.form && !formAnim) return;
       state.form = form;
+      applyHighlight();
       const to = form === 'pyramid' ? 1 : 0;
       if (!animate || reducedMotion) { formAnim = null; formT = to; applyMorph(true); applyForm(); updateCutUniforms(); }
       else formAnim = { from: formT, to, start: performance.now() };
+      // free では、その形を見るための既定の視点（地形型は overview、ピラミッド型は斜めから全体）へ移す
       if (state.camera !== 'free') moveCamera(state.camera, animate);
+      else moveTo(presetPose('overview', form), animate);
+      requestRender();
+    },
+    /** 視点を今の段の既定に戻す。free では、今の形を見るための既定の視点（setForm と同じ）へ移す */
+    resetView({ animate = true } = {}) {
+      moveTo(presetPose(state.camera === 'free' ? 'overview' : state.camera, state.form), animate);
       requestRender();
     },
     /** preset: CAMERA_PRESETS のいずれか。free は今の視点のままオービット操作を有効にする */
@@ -648,8 +734,10 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       if (!CAMERA_PRESETS.includes(preset)) throw new Error('unknown camera preset: ' + preset);
       const wasFront = state.camera === 'pyramid-front';
       state.camera = preset;
-      if (preset === 'free') { camAnim = null; api.setOrbit(true); }
+      // free は今の視点のまま（移動中ならその行き先まで）。触ると移動をやめる
+      if (preset === 'free') api.setOrbit(true);
       if (wasFront !== (preset === 'pyramid-front')) { rebuildCut(); updateCutUniforms(); applyForm(); }
+      if (preset === 'free') { applyHighlight(); requestRender(); return; }
       applyHighlight();
       moveCamera(preset, animate);
       requestRender();
@@ -678,6 +766,7 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     },
     resize(w, h) {
       W = Math.max(1, Math.round(w)); H = Math.max(1, Math.round(h));
+      renderer.setPixelRatio(pixelRatio());
       renderer.setSize(W, H, false);
       for (const m of lineMats) m.resolution.set(W, H);
       if (state.camera !== 'free') {
@@ -706,7 +795,7 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     },
     /** 確認用：ワールド座標 → canvas 内の座標（px）。補間の形は今の表示に従う */
     _debug: {
-      model: M,
+      model: M, presets: PRE,
       project(p) { const v = new THREE.Vector3(...p).project(camera); return { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H }; },
       isAnimating: () => !!(formAnim || camAnim),
       /** 補間値を固定して描く（確認用。次の setForm で元に戻る） */

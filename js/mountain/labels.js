@@ -16,13 +16,15 @@ export class LabelSet {
     const item = { text, posA, posB, style, sprite: null, pxW: 0, pxH: 0 };
     this._draw(item);
     this.items.push(item); this.group.add(item.sprite);
+    // 重なりの判定は priority の高い順（同じなら足した順）
+    this.order = [...this.items].sort((a, b) => (b.style.priority || 0) - (a.style.priority || 0));
     return item;
   }
 
   setText(item, text) { if (item.text === text) return; item.text = text; this._draw(item); }
 
   _draw(item) {
-    const { size = 11, color = '#777', weight = 400, anchor = [0.5, 0.5], halo = true, onTop = false } = item.style;
+    const { size = 11, color = '#6b6b6b', weight = 400, anchor = [0.5, 0.5], halo = true, onTop = false } = item.style;
     const dpr = 2;
     const c = document.createElement('canvas'), g = c.getContext('2d');
     const font = `${weight} ${size * dpr}px ${FONT}`;
@@ -43,10 +45,14 @@ export class LabelSet {
     item.pxW = w / dpr; item.pxH = h / dpr;
   }
 
-  /** 形の補間 t（0＝地形型、1＝ピラミッド型）とカメラに合わせて、位置・不透明度・大きさを更新する */
-  update(t, camera, viewH, offsetB = null, sizeFactor = 1) {
+  /**
+   * 形の補間 t（0＝地形型、1＝ピラミッド型）とカメラに合わせて、位置・不透明度・大きさを更新する。
+   * キャンバスの端で切れる文字と、priority の高い文字に重なる文字は出さない。
+   */
+  update(t, camera, viewW, viewH, offsetB = null, sizeFactor = 1) {
     const k = sizeFactor * 2 / (viewH * camera.projectionMatrix.elements[5]);
-    for (const it of this.items) {
+    const kept = [], v = new THREE.Vector3();
+    for (const it of this.order) {
       const sp = it.sprite;
       let op;
       if (it.posA && it.posB) {
@@ -60,6 +66,16 @@ export class LabelSet {
         sp.position.set(b[0], b[1], b[2] + (offsetB && it.style.front ? offsetB : 0));
       }
       if (it.hidden) op = 0;
+      if (op > 0.01) {
+        v.copy(sp.position).project(camera);
+        const cx = (v.x + 1) / 2 * viewW, cy = (1 - v.y) / 2 * viewH;
+        // 文字の縁取り（左右 4px）と行の余白を除いた、字の部分の大きさ
+        const hw = (it.pxW - 6) * sizeFactor / 2, hh = it.pxH * sizeFactor * 0.42;
+        const r = [cx - hw, cy - hh, cx + hw, cy + hh];
+        if (v.z > 1 || v.z < -1 || r[0] < 0 || r[1] < 0 || r[2] > viewW || r[3] > viewH) op = 0;
+        else if (kept.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) op = 0;
+        else kept.push(r);
+      }
       sp.material.opacity = op; sp.visible = op > 0.01;
       sp.scale.set(it.pxW * k, it.pxH * k, 1);
     }
