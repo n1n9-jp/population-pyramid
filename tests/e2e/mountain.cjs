@@ -1,15 +1,17 @@
 'use strict';
 // 3Dページ「人口の山脈とコホートの糸」（mountain.html）の E2E テスト。仕様は docs/MOUNTAIN.md §4〜§7。
-// 使い方: node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--out DIR]
+// 使い方: node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--stub] [--out DIR]
+// --stub は ?stub=1（scene-stub.js）で開く。3D 描画は検査せず、状態・UI・ツールチップだけを検査する。
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
 
 function parseArgs(argv) {
-  const a = { base: 'http://localhost:8000', fixture: false, out: null };
+  const a = { base: 'http://localhost:8000', fixture: false, stub: false, out: null };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--base') a.base = argv[++i];
     else if (argv[i] === '--fixture') a.fixture = true;
+    else if (argv[i] === '--stub') a.stub = true;
     else if (argv[i] === '--out') a.out = argv[++i];
     else throw new Error('不明な引数: ' + argv[i]);
   }
@@ -25,7 +27,7 @@ const MOBILE = { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch
 
 const STEPS = ['overview', 'war', 'dankai', 'hinoeuma', 'dankai-jr', 'cut2025', 'free'];
 const ALL_IDS = ['dankai', 'hinoeuma', 'dankai-jr', 'postwar'];
-// MOUNTAIN.md §5 の表。hl: 'all' は「すべて」（空配列か4世代すべてを許す）、null は検査しない。
+// MOUNTAIN.md §5 の表。hl: 'all' は「すべて」＝4世代すべて、null は検査しない。
 const EXPECT = {
   overview: { form: 'terrain', camera: 'overview', hl: 'all', cut: null },
   war: { form: 'terrain', camera: 'war', hl: ['postwar'], cut: null },
@@ -53,14 +55,15 @@ async function check(name, fn) {
   }
 }
 
-function url(q) {
+function url(q, noStub) {
   const parts = [];
   if (args.fixture) parts.push('fixture=1');
+  if (args.stub && !noStub) parts.push('stub=1');
   if (q) parts.push(q);
   return `${args.base}/mountain.html${parts.length ? '?' + parts.join('&') : ''}`;
 }
 
-async function openPage(browser, opts, label, extra, { record = true, init, waitReady = true } = {}) {
+async function openPage(browser, opts, label, extra, { record = true, init, waitReady = true, noStub = false } = {}) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   if (init) await page.addInitScript(init);
@@ -74,7 +77,7 @@ async function openPage(browser, opts, label, extra, { record = true, init, wait
   page.on('pageerror', (e) => rec('pageerror', e.message));
   page.on('requestfailed', (r) => rec('requestfailed', `${r.url()} ${r.failure() && r.failure().errorText}`));
   page.on('response', (r) => { if (r.status() >= 400) rec('http' + r.status(), r.url()); });
-  await page.goto(url(extra), { waitUntil: 'load' });
+  await page.goto(url(extra, noStub), { waitUntil: 'load' });
   if (waitReady) await page.waitForSelector('body[data-ready="true"]', { timeout: 90000 });
   return { ctx, page, mine };
 }
@@ -85,7 +88,7 @@ const getState = (page) => page.evaluate(() => window.__mountain.scene.getState(
 function hlMatches(actual, want) {
   if (want === null) return true;
   const a = [...(actual || [])].sort();
-  if (want === 'all') return a.length === 0 || (a.length === ALL_IDS.length && ALL_IDS.every((id) => a.includes(id)));
+  if (want === 'all') return a.length === ALL_IDS.length && ALL_IDS.every((id) => a.includes(id));
   return a.length === want.length && want.every((id) => a.includes(id));
 }
 function stateMatches(s, e) {
@@ -235,7 +238,7 @@ async function main() {
       assert(await fp.inputValue('#cut-slider') === '1944', `スライダー値=${await fp.inputValue('#cut-slider')} 期待=1944`);
     });
 
-    await check('4c. #inset の rect.inset-bar の data-value が断面の年の data（male/female）と一致する', async () => {
+    await check('4c. #inset の rect.inset-bar の data-value が断面の年の data と一致し、openAge の段は .inset-open である', async () => {
       const bad = [];
       for (const y of [1960, 1944, 2025]) {
         await fp.locator('#cut-slider').fill(String(y));
@@ -258,27 +261,142 @@ async function main() {
         }
         if (miss) bad.push(`${y}: 棒が見つからない年齢が${miss}件（0〜${rec.openAge - 1}歳×男女）`);
         if (diff.length) bad.push(`${y}: ${diff.slice(0, 5).join(' / ')}`);
-        // openAge の段は含めない
-        const over = bars.filter((b) => b.age >= rec.openAge && b.value !== '');
-        if (over.length) bad.push(`${y}: openAge(${rec.openAge}歳)以上の棒が${over.length}本`);
+        // openAge の段は面（3D）には含めないが、小窓は全国ページと同じく .inset-open の棒で描く
+        const open = await fp.$$eval('#inset rect.inset-bar', (rs) => rs.filter((r) => r.classList.contains('inset-open')).map((r) => Number(r.dataset.age)));
+        const wrong = open.filter((a) => a !== rec.openAge);
+        if (wrong.length) bad.push(`${y}: openAge(${rec.openAge}歳)以外に .inset-open がある: ${wrong.join(',')}`);
+        const openBars = bars.filter((b) => b.age === rec.openAge);
+        if (openBars.length && open.length !== openBars.length) bad.push(`${y}: openAge の棒${openBars.length}本のうち .inset-open は${open.length}本`);
+        if (openBars.length === 0) bad.push(`${y}: openAge(${rec.openAge}歳)の段の棒がない（.inset-open で描く）`);
       }
       assert(bad.length === 0, bad.join('\n'));
     });
 
-    await check('4d. #cohort-select で強調する世代が変わる（getState().highlight）', async () => {
+    await check('4d. #cohort-select：クリックの前後で、checked と getState().highlight の中身が一致する', async () => {
       const bad = [];
-      const before = (await getState(fp)).highlight || [];
-      for (const id of ['hinoeuma', 'postwar']) {
+      const checkedIds = () => fp.$$eval('#cohort-select input[data-cohort]', (is) => is.filter((i) => i.checked).map((i) => i.dataset.cohort).sort());
+      const sameAsChecked = async (label) => {
+        const want = await checkedIds();
+        try {
+          await fp.waitForFunction((w) => JSON.stringify([...(window.__mountain.scene.getState().highlight || [])].sort()) === JSON.stringify(w), want, { timeout: 4000 });
+        } catch (e) { bad.push(`${label}: checked=${JSON.stringify(want)} highlight=${JSON.stringify((await getState(fp)).highlight)}`); }
+        return want;
+      };
+      const before = await sameAsChecked('クリック前');
+      for (const id of ['hinoeuma', 'postwar', 'hinoeuma']) {
         const sel = `#cohort-select input[data-cohort="${id}"]`;
         if (await fp.locator(sel).count() !== 1) { bad.push(`${sel} が1つでない`); continue; }
+        const was = (await checkedIds()).includes(id);
         await fp.locator(sel).click();
-        try {
-          await fp.waitForFunction((x) => (window.__mountain.scene.getState().highlight || []).includes(x), id, { timeout: 4000 });
-        } catch (e) { bad.push(`${id}: highlight=${JSON.stringify((await getState(fp)).highlight)}`); }
+        const now = await sameAsChecked(`${id}をクリック後`);
+        if (now.includes(id) === was) bad.push(`${id}: クリックで checked が切り替わらない`);
       }
-      const after = (await getState(fp)).highlight || [];
-      if (JSON.stringify([...before].sort()) === JSON.stringify([...after].sort())) bad.push(`highlight が変わらない: ${JSON.stringify(after)}`);
+      const after = await sameAsChecked('最後');
+      if (JSON.stringify(before) === JSON.stringify(after)) bad.push(`3回のクリックで状態が変わらない: ${JSON.stringify(after)}`);
       assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check('4e. 断面スライダーをドラッグして推計のない年をまたいでも、向きどおりに進み、行き来しない', async () => {
+      const g = data.gaps[0];
+      assert(g, 'data.gaps が空');
+      const s0 = g.start - 1, e0 = g.end + 1;
+      const drag = (v) => fp.evaluate((val) => {
+        const el = document.getElementById('cut-slider');
+        el.value = String(val);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        return window.__mountain.scene.getState().cutYear;
+      }, v);
+      const got = [];
+      const up = [s0]; for (let v = g.start; v <= g.end; v++) up.push(v); up.push(e0, e0 + 1);
+      const down = [e0 + 1, e0]; for (let v = g.end; v >= g.start; v--) down.push(v); down.push(s0, s0 - 1);
+      await fp.locator('#cut-slider').fill(String(s0));
+      await fp.waitForFunction((x) => window.__mountain.scene.getState().cutYear === x, s0, { timeout: 4000 });
+      for (const v of up) got.push(['↑', v, await drag(v)]);
+      await fp.locator('#cut-slider').fill(String(e0 + 1));
+      for (const v of down) got.push(['↓', v, await drag(v)]);
+      const bad = [];
+      for (const [d, raw, cut] of got) {
+        const exp = raw >= g.start && raw <= g.end ? (d === '↑' ? e0 : s0) : raw;
+        if (cut !== exp) bad.push(`${d} 生の値${raw} → 断面${cut}（期待${exp}）`);
+      }
+      assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check('4f. データ表：開くと全行（0〜ageMax歳）が出て、年齢は th scope=row、値のない所は「—」。閉じている間は描かない', async () => {
+      await fp.locator('#cut-slider').fill('2025');
+      await fp.waitForFunction(() => window.__mountain.scene.getState().cutYear === 2025, null, { timeout: 4000 });
+      assert(await fp.locator('#data-table tbody tr').count() === 0, '閉じている間に表の行が描かれている');
+      await fp.click('#data-details > summary');
+      await fp.waitForFunction(() => document.querySelectorAll('#data-table tbody tr').length > 0, null, { timeout: 4000 });
+      const rec = yearRec(data, 2025);
+      const rows = await fp.$$eval('#data-table tbody tr', (trs) => trs.map((tr) => ({ th: tr.querySelector('th') && tr.querySelector('th').getAttribute('scope'), thText: tr.querySelector('th') && tr.querySelector('th').textContent, tds: [...tr.querySelectorAll('td')].map((t) => t.textContent) })));
+      const bad = [];
+      if (rows.length !== data.ageMax + 1) bad.push(`行数=${rows.length} 期待=${data.ageMax + 1}`);
+      rows.forEach((r, a) => {
+        if (r.th !== 'row') bad.push(`${a}歳: th scope=${r.th}`);
+        const m = rec.male[a], f = rec.female[a];
+        const exp = [m == null ? '—' : m.toLocaleString('en-US'), f == null ? '—' : f.toLocaleString('en-US'), m == null || f == null ? '—' : (m + f).toLocaleString('en-US')];
+        if (JSON.stringify(r.tds) !== JSON.stringify(exp)) bad.push(`${a}歳: ${JSON.stringify(r.tds)} 期待=${JSON.stringify(exp)}`);
+      });
+      const head = await fp.$$eval('#data-table thead th', (ths) => ths.map((t) => t.getAttribute('scope')));
+      if (head.some((h) => h !== 'col')) bad.push(`見出しの scope=${JSON.stringify(head)}`);
+      await fp.click('#data-details > summary');
+      assert(bad.slice(0, 8).length === 0, bad.slice(0, 8).join('\n'));
+    });
+
+    await check('4g. ツールチップ：糸か面をクリックすると #pick-tooltip に「N年生まれ」・年と年齢・男女と人数が、全国ページの書式で出る', async () => {
+      await fp.locator('#form-toggle button[data-form="terrain"]').click();
+      await fp.locator('#cut-slider').fill('2025');
+      const box = await fp.locator('canvas#mountain-canvas').boundingBox();
+      let text = null, parts = null;
+      for (let gy = 0.3; gy <= 0.9 && !parts; gy += 0.05) {
+        for (let gx = 0.2; gx <= 0.9 && !parts; gx += 0.05) {
+          await fp.mouse.click(box.x + box.width * gx, box.y + box.height * gy);
+          await sleep(60);
+          parts = await fp.evaluate(() => {
+            const t = document.getElementById('pick-tooltip');
+            if (!t || t.hidden) return null;
+            return { head: (t.querySelector('.tip-head') || {}).textContent, sub: (t.querySelector('.tip-sub') || {}).textContent, val: (t.querySelector('.tip-val') || {}).textContent };
+          });
+        }
+      }
+      assert(parts, 'canvas をクリックしてもツールチップが出ない');
+      const bad = [];
+      const m1 = /^(\d{4})年生まれ$/.exec(parts.head || '');
+      const m2 = /^(\d{4})年・(数え年)?(\d+)歳(以上)?$/.exec(parts.sub || '');
+      const m3 = /^(男性|女性) ([\d,]+人|[\d.]+万人)$/.exec(parts.val || '');
+      if (!m1) bad.push(`世代の書式: ${JSON.stringify(parts.head)}`);
+      if (!m2) bad.push(`年・年齢の書式: ${JSON.stringify(parts.sub)}`);
+      if (!m3) bad.push(`人数の書式: ${JSON.stringify(parts.val)}`);
+      if (!bad.length) {
+        const rec = yearRec(data, Number(m2[1]));
+        const sex = m3[1] === '男性' ? 'male' : 'female';
+        const v = rec && rec[sex][Number(m2[3])];
+        const num = (x) => Math.round(x).toLocaleString('en-US');
+        const exp = v == null ? null : rec.precision === 1 ? `${num(v)}人` : v >= 1e4 ? `${(v / 1e4).toFixed(1)}万人` : `${num(v)}人`;
+        if (exp !== m3[2]) bad.push(`人数が data と違う: 表示=${m3[2]} 期待=${exp}（${m2[1]}年${m3[1]}${m2[3]}歳）`);
+      }
+      assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check('4h. 注記：断面の年に応じて #year-notes に data.notes の文言が出る', async () => {
+      const bad = [];
+      for (const y of [1940, 2025, 1960]) {
+        await fp.locator('#cut-slider').fill(String(y));
+        await fp.waitForFunction((x) => window.__mountain.scene.getState().cutYear === x, y, { timeout: 4000 });
+        const got = await fp.$$eval('#year-notes li', (ls) => ls.map((l) => l.textContent));
+        const want = (yearRec(data, y).noteIds || []).filter((id) => data.notes[id]).map((id) => data.notes[id].text);
+        if (JSON.stringify(got) !== JSON.stringify(want)) bad.push(`${y}: ${JSON.stringify(got)} 期待=${JSON.stringify(want)}`);
+      }
+      const list = await fp.$$eval('#notes-list li', (ls) => ls.length);
+      if (list !== Object.keys(data.notes).length) bad.push(`#notes-list の数=${list} 期待=${Object.keys(data.notes).length}`);
+      assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check(args.fixture ? '4i. --fixture：「サンプルデータ」の帯が出る' : '4i. 実データ：「サンプルデータ」の帯は出ない', async () => {
+      const vis = await fp.locator('#fixture-banner').isVisible();
+      assert(vis === args.fixture, `帯の表示=${vis} 期待=${args.fixture}`);
+      if (args.fixture) assert(/サンプルデータ/.test(await fp.textContent('#fixture-banner')), '帯に「サンプルデータ」がない');
     });
     await f.ctx.close();
 
@@ -320,6 +438,7 @@ async function main() {
     const nw = await openPage(browser, DESKTOP, 'no-webgl', null, {
       record: false,
       waitReady: false,
+      noStub: true, // WebGL なしの経路は本物の scene.js 側にあるので、stub は使わない
       init: () => {
         const orig = HTMLCanvasElement.prototype.getContext;
         HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
