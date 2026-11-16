@@ -1,0 +1,87 @@
+/* 3Dページ（mountain.html）。基本の色・書体は css/style.css を使う。 */
+.m-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+  max-width: 1440px; margin: 0 auto; align-items: start;
+}
+.m-stage {
+  position: sticky; top: 0; height: 100vh; height: 100dvh; background: #fff;
+  border-right: 1px solid var(--grid); overflow: hidden;
+}
+#mountain-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; }
+.m-stage:has(#mountain-canvas[data-free="true"]) #mountain-canvas { touch-action: none; }
+.m-text { padding: 0 20px 48px; min-width: 0; }
+.m-text .site-header { padding: 8px 0 12px; }
+.scroll-hint { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; text-align: center; font-size: 12px; color: var(--muted); pointer-events: none; }
+
+.scene-step { min-height: 80vh; padding: 28px 0 40px; border-top: 1px solid var(--grid); }
+.scene-step h2 { font-size: 18px; margin: 0 0 8px; line-height: 1.4; }
+.scene-step p { margin: 0 0 10px; font-size: 15px; line-height: 1.8; }
+.scene-step a { color: var(--male-strong); overflow-wrap: anywhere; }
+body[data-step] .scene-step { transition: opacity .2s; opacity: .55; }
+body[data-step="overview"] .scene-step[data-step="overview"],
+body[data-step="war"] .scene-step[data-step="war"],
+body[data-step="dankai"] .scene-step[data-step="dankai"],
+body[data-step="hinoeuma"] .scene-step[data-step="hinoeuma"],
+body[data-step="dankai-jr"] .scene-step[data-step="dankai-jr"],
+body[data-step="cut2025"] .scene-step[data-step="cut2025"],
+body[data-step="free"] .scene-step[data-step="free"] { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { body[data-step] .scene-step { transition: none; } }
+
+/* free の操作部 */
+.free-ui { display: grid; gap: 16px; margin-top: 12px; }
+.ctl-group { border: 0; padding: 0; margin: 0; min-width: 0; font-size: 14px; }
+.ctl-label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 4px; padding: 0; }
+.ctl-group label { display: block; padding: 4px 0; }
+.ctl-group input[type="checkbox"] { width: 18px; height: 18px; margin-right: 6px; vertical-align: -3px; accent-color: var(--male-strong); }
+.ctl-note { margin: 2px 0 0 !important; font-size: 12px !important; line-height: 1.5 !important; color: var(--muted); min-height: 18px; }
+.seg { display: flex; gap: 0; }
+.seg button {
+  flex: 1; min-height: 44px; padding: 0 10px; border: 1px solid var(--muted); background: #fffdf6;
+  color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
+}
+.seg button:first-child { border-radius: 6px 0 0 6px; }
+.seg button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.seg button[aria-pressed="true"] { background: var(--male-strong); border-color: var(--male-strong); color: #fff; font-weight: 700; }
+#cut-slider { width: 100%; height: 32px; margin: 0; accent-color: var(--male-strong); cursor: pointer; }
+
+.inset { width: 100%; max-width: 360px; background: #fffdf6; border: 1px solid var(--grid); }
+.inset-svg { display: block; width: 100%; height: auto; }
+.inset-svg text { fill: var(--muted); font-size: 8px; font-family: inherit; }
+.inset-svg .inset-year { font-size: 12px; font-weight: 700; fill: var(--ink); }
+.inset-svg .inset-head { font-size: 9px; font-weight: 700; }
+.inset-svg .sex-male { fill: var(--male-strong); }
+.inset-svg .sex-female { fill: var(--female-strong); }
+.inset-svg .inset-age { fill: var(--ink); paint-order: stroke; stroke: #fffdf6; stroke-width: 2px; }
+.inset-open { fill-opacity: .55; }
+.inset .grid-line { stroke: var(--grid); stroke-width: .5; }
+.inset .baseline { stroke: var(--muted); stroke-width: .6; }
+
+/* ツールチップ */
+.pick-tooltip {
+  position: absolute; z-index: 5; pointer-events: none; background: #fffdf6; color: var(--ink);
+  border: 1px solid var(--muted); border-radius: 4px; padding: 6px 10px; font-size: 13px; line-height: 1.5;
+  box-shadow: 0 2px 8px rgba(42, 38, 32, .18); display: flex; flex-direction: column; min-width: 130px;
+}
+.pick-tooltip .tip-head { font-size: 14px; }
+.pick-tooltip .tip-sub { color: var(--muted); font-size: 12px; }
+.pick-tooltip .tip-val { font-weight: 700; }
+.pick-tooltip .tip-male { color: var(--male-strong); }
+.pick-tooltip .tip-female { color: var(--female-strong); }
+
+/* WebGL が使えないとき */
+.webgl-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; overflow: auto; }
+.webgl-fallback img { width: 100%; height: auto; max-height: 75%; object-fit: contain; display: block; }
+.webgl-fallback p { margin: 0; padding: 8px 16px; font-size: 13px; color: var(--muted); }
+#chart-error { margin: 16px; padding: 16px; border: 1px solid var(--female-strong); background: #fffdf6; font-size: 15px; }
+
+.m-layout + .page { padding-top: 8px; }
+.m-text .data-details { margin-top: 8px; }
+
+/* 狭い画面：上に canvas、下に段落（モック08） */
+@media (max-width: 899px) {
+  .m-layout { display: block; }
+  .m-stage { height: 46vh; height: 46dvh; z-index: 10; border-right: 0; border-bottom: 1px solid var(--grid); }
+  .m-text { padding: 0 16px 32px; }
+  .scene-step { min-height: 42vh; scroll-margin-top: 47vh; padding: 20px 0 28px; }
+  .scene-step p { font-size: 14px; }
+}

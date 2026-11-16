@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>人口の山脈とコホートの糸 1920–2025</title>
+  <meta name="description" content="日本の各歳別人口を、年・年齢・人数の3軸の山脈として眺めます。同じ年に生まれた世代の軌跡（コホートの糸）をたどれます。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/mountain.css">
+  <script type="importmap">
+  { "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  } }
+  </script>
+  <script type="module" src="js/mountain/main.js"></script>
+</head>
+<body data-step="overview" data-form="terrain">
+  <div id="fixture-banner" class="fixture-banner" hidden>サンプルデータ（実際の統計ではありません）</div>
+  <div class="m-layout">
+    <div class="m-stage" id="stage">
+      <canvas id="mountain-canvas" aria-label="人口の山脈の3D表示" role="img"></canvas>
+      <div id="webgl-fallback" class="webgl-fallback" hidden>
+        <img src="assets/mountain-fallback.png" alt="人口の山脈の静止画。横が年、奥行きが年齢、高さが人数で、手前が男性、奥が女性。">
+        <p>お使いの環境では3D表示を使えないため、静止画を表示しています。全国ページの人口ピラミッドは、そのままご利用いただけます。</p>
+      </div>
+      <div id="pick-tooltip" class="pick-tooltip" role="tooltip" hidden></div>
+      <p class="scroll-hint" aria-hidden="true">↓ スクロールして読む</p>
+    </div>
+
+    <div class="m-text">
+      <header class="site-header">
+        <h1>人口の山脈とコホートの糸 <span class="range">1920–2025</span></h1>
+        <p class="page-nav"><a href="index.html">← 全国の各歳別ピラミッド</a>　<a href="regions.html">都道府県・地方別に見る →</a></p>
+        <p class="lede">日本の各歳・男女別の人口を、年・年齢・人数の3軸で立体にしました。スクロールすると、見る場所が切り替わります。</p>
+      </header>
+
+      <section class="scene-step" data-step="overview" aria-labelledby="h-overview">
+        <h2 id="h-overview">人口の山脈を、年と年齢で眺める</h2>
+        <p>横が年（1920→2025）、奥行きが年齢（0→100歳）、高さが人数です。手前の面が男性、奥の面が女性で、100歳の側を境に鏡写しに置いています。</p>
+        <p>山脈の表面を斜めに走る細い線は、同じ年に生まれた世代の軌跡です。年が進むほど、世代は1歳ずつ年齢を重ねます。</p>
+        <p>総人口は、1920年の<span data-calc="total-1920">5,596万人</span>から、2025年の<span data-calc="total-2025">1億2,297万人</span>になりました。</p>
+      </section>
+
+      <section class="scene-step" data-step="war" aria-labelledby="h-war">
+        <h2 id="h-war">戦争の時期は、データに切れ目がある</h2>
+        <p>1941〜1943年は年齢別の推計を行っていないため、面にはすき間が空いています。1944〜1946年の年齢は数え年で、満年齢より1〜2歳高く表示されるので、その帯は淡く描き、世代の糸も破線にしています。</p>
+        <p>終戦前後の1945〜1946年生まれ（破線）は、出生が大きく減った世代です。1950年には、3歳（1947年生まれ）の<span data-calc="p1950-3">235万人</span>に対し、4歳（1946年生まれ）は<span data-calc="p1950-4">154万人</span>しかいません。</p>
+      </section>
+
+      <section class="scene-step" data-step="dankai" aria-labelledby="h-dankai">
+        <h2 id="h-dankai">団塊の世代：第1次ベビーブーム</h2>
+        <p>1947〜1949年に生まれた「団塊の世代」は、戦後の第1次ベビーブームの世代です。<a href="https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei25/dl/05_gaikyouR07.pdf" target="_blank" rel="noopener">厚生労働省「人口動態統計」</a>によると、出生数は1947年に2,678,792人、1948年に2,681,624人、1949年に2,696,638人でした。</p>
+        <p>強調した糸をたどると、この世代は2025年に76〜78歳で、合わせて約<span data-calc="dankai-2025">552万人</span>です。</p>
+      </section>
+
+      <section class="scene-step" data-step="hinoeuma" aria-labelledby="h-hinoeuma">
+        <h2 id="h-hinoeuma">丙午（1966年生まれ）：ひとつだけの谷</h2>
+        <p>1966年は丙午（ひのえうま）の年です。出生数は、前年の1965年に1,823,697人、1966年に1,360,974人、翌1967年に1,935,647人でした（<a href="https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei25/dl/05_gaikyouR07.pdf" target="_blank" rel="noopener">厚生労働省「人口動態統計」</a>）。</p>
+        <p>糸は、山脈の中でここだけ谷を通ります。2025年には59歳で<span data-calc="h-59">138万人</span>と、58歳の<span data-calc="h-58">178万人</span>、60歳の<span data-calc="h-60">170万人</span>より少なくなっています。</p>
+      </section>
+
+      <section class="scene-step" data-step="dankai-jr" aria-labelledby="h-dankai-jr">
+        <h2 id="h-dankai-jr">団塊ジュニア：第2次ベビーブーム</h2>
+        <p>団塊の世代の子どもにあたる1971〜1974年生まれは「団塊ジュニア」と呼ばれ、第2次ベビーブームを作りました。出生数は1971年に2,000,973人、1972年に2,038,682人、1973年に2,091,983人、1974年に2,029,989人で、1973年が最多です（<a href="https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei25/dl/05_gaikyouR07.pdf" target="_blank" rel="noopener">厚生労働省「人口動態統計」</a>）。</p>
+        <p>2025年には51〜54歳で、合わせて約<span data-calc="jr-2025">791万人</span>です。</p>
+      </section>
+
+      <section class="scene-step" data-step="cut2025" aria-labelledby="h-cut2025">
+        <h2 id="h-cut2025">2025年で山脈を切ると、人口ピラミッドになる</h2>
+        <p>2025年の断面が、いわゆる人口ピラミッドです。下がすぼまり、上が厚い形になっています。</p>
+        <p>65歳以上は<span data-calc="s65">3,614万人</span>で、人口の<span data-calc="r65">29.4%</span>（75歳以上は<span data-calc="r75">17.2%</span>）です（<a href="https://www.stat.go.jp/data/kokusei/2025/kekka/pdf/outline_01.pdf" target="_blank" rel="noopener">総務省統計局「令和7年国勢調査 人口等基本集計 結果の概要」</a>）。0〜14歳は<span data-calc="s14">1,335万人</span>です。</p>
+        <p>2025年の出生数は671,270人で、1899年の調査開始以来最少になりました。</p>
+      </section>
+
+      <section class="scene-step" id="free" data-step="free" aria-labelledby="h-free">
+        <h2 id="h-free">自分で動かして確かめる</h2>
+        <p>ドラッグで回転、ホイールやピンチで拡大・縮小できます。山脈や糸にカーソルを合わせる（スマートフォンではタップする）と、その地点の人数が出ます。</p>
+        <div class="free-ui">
+          <div class="ctl-group">
+            <span class="ctl-label" id="lbl-form">形</span>
+            <div id="form-toggle" class="seg" role="group" aria-labelledby="lbl-form">
+              <button type="button" data-form="terrain" aria-pressed="true">地形型</button>
+              <button type="button" data-form="pyramid" aria-pressed="false">立体ピラミッド型</button>
+            </div>
+          </div>
+          <div class="ctl-group">
+            <label class="ctl-label" for="cut-slider">断面の年：<output id="cut-year-out" for="cut-slider">2025年</output></label>
+            <input type="range" id="cut-slider" min="1920" max="2025" step="1" value="2025">
+            <p id="cut-note" class="ctl-note" aria-live="polite"></p>
+          </div>
+          <fieldset id="cohort-select" class="ctl-group">
+            <legend class="ctl-label">強調する世代</legend>
+            <label><input type="checkbox" data-cohort="dankai" checked> 団塊の世代（1947〜49年生まれ）</label>
+            <label><input type="checkbox" data-cohort="hinoeuma" checked> 丙午（1966年生まれ）</label>
+            <label><input type="checkbox" data-cohort="dankai-jr" checked> 団塊ジュニア（1971〜74年生まれ）</label>
+            <label><input type="checkbox" data-cohort="postwar" checked> 終戦前後（1945〜46年生まれ・破線）</label>
+          </fieldset>
+          <div class="ctl-group">
+            <span class="ctl-label">断面の年の2Dピラミッド</span>
+            <div id="inset" class="inset"></div>
+          </div>
+        </div>
+      </section>
+
+      <details id="data-details" class="data-details">
+        <summary>断面の年のデータを表で見る</summary>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="年齢別人口の表">
+          <table id="data-table">
+            <caption id="data-table-caption"></caption>
+            <thead><tr><th scope="col">年齢</th><th scope="col">男性</th><th scope="col">女性</th><th scope="col">計</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div class="page">
+    <section class="about">
+      <h2>見方の注意</h2>
+      <p>1941〜1943年は年齢別の推計を行っていないため、面にすき間があります。1944〜1946年の年齢は数え年です。1945〜1971年の人口は沖縄県を含みません。各年のいちばん上の段は「その年齢以上」をまとめた区分（85歳以上、90歳以上、100歳以上など）で、面には含めず、面の上端の外に小さな印で示します。</p>
+      <p><a href="index.html">全国の各歳別ピラミッド</a>・<a href="regions.html">都道府県・地方別</a></p>
+    </section>
+    <footer id="sources" class="sources">
+      <h2>出典</h2>
+      <p id="attribution"></p>
+      <ul id="source-list"></ul>
+    </footer>
+  </div>
+</body>
+</html>
