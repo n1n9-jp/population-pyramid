@@ -19,6 +19,7 @@ export { COHORT_IDS };
 const FORM_MS = 700, CAM_MS = 900;
 const ORTHO_EQ_FOV = 6;            // 正射影へ切り替える直前の、ほぼ平行な透視投影の画角
 const NO_CUT = 1e6;
+const TIGHT_MARGIN = 0.94;       // overview：外形の投影がキャンバスの幅か高さのこの割合を占める
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /* ---------------------------------------------------------------- カメラのプリセット */
@@ -28,7 +29,7 @@ function presetTable(M) {
   const TX = M.TX, PZ = M.PZ;
   return {
     terrain: {
-      overview: { target: [0, 1.2, 1.0], dir: [-0.26, 0.72, 0.64], fov: 33, fitR: 13.1, fitBox: true },
+      overview: { target: [0, 1.2, 1.0], dir: [-0.26, 0.72, 0.64], fov: 33, fitR: 13.1, fitBox: true, tight: true },
       war: { target: [-5.5, 1.0, 0], dir: [-0.6, 0.55, 0.58], fov: 33, fitR: 9.4 },
       dankai: { target: [3.0, 1.2, 4.0], dir: [-0.42, 0.6, 0.68], fov: 33, fitR: 9.7 },
       hinoeuma: { target: [4.2, 1.2, 6.0], dir: [-0.36, 0.62, 0.7], fov: 33, fitR: 8.6 },
@@ -37,7 +38,7 @@ function presetTable(M) {
       'pyramid-front': { ortho: true, target: cut => [TX(cut), 3.6, 0], dir: [1, 0, 0], view: 9.0, fitW: 22.5, quiet: true },
     },
     pyramid: {
-      overview: { target: [0, 4.8, -1.0], dir: [-0.62, 0.34, 0.72], fov: 30, fitR: 11.4, fitBox: true },
+      overview: { target: [0, 4.8, -1.0], dir: [-0.62, 0.34, 0.72], fov: 30, fitR: 11.4, fitBox: true, tight: true },
       war: { target: [0, 3.9, PZ(1950)], dir: [-0.72, 0.32, 0.62], fov: 30, fitR: 11.2 },
       dankai: { target: [0, 4.6, PZ(1985)], dir: [-0.66, 0.32, 0.68], fov: 30, fitR: 9.4 },
       hinoeuma: { target: [0, 4.0, PZ(1995)], dir: [-0.64, 0.3, 0.7], fov: 30, fitR: 8.8 },
@@ -422,12 +423,20 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     }
     const vf = THREE.MathUtils.degToRad(p.fov) / 2, hf = Math.atan(Math.tan(vf) * asp);
     let dist = p.fitR / Math.sin(Math.min(vf, hf));
-    if (p.fitBox) dist = Math.max(dist * 0.85, boxDist(CONTENT[form], target, dir, Math.tan(vf), Math.tan(hf)));
+    if (p.tight) {
+      // 内容の外形の投影が画面に収まる距離を求め、投影の中心が画面の中心に来るよう注視点を動かす
+      const tv = Math.tan(vf), th = Math.tan(hf);
+      for (let i = 0; i < 4; i++) {
+        dist = boxDist(CONTENT[form], target, dir, tv, th, TIGHT_MARGIN);
+        boxCenterShift(CONTENT[form], target, dir, dist, tv, th);
+      }
+      dist = boxDist(CONTENT[form], target, dir, tv, th, TIGHT_MARGIN);
+    } else if (p.fitBox) dist = Math.max(dist * 0.85, boxDist(CONTENT[form], target, dir, Math.tan(vf), Math.tan(hf)));
     return { ortho: false, target, dir, fov: p.fov, dist };
   }
   // 内容（面・軸・目盛り）の外形。俯瞰のプリセットは、これが画面に収まる距離に置く
   const CONTENT = {
-    terrain: [[M.TX(M.yMin) - 2.6, M.TX(M.yMax) + 2.2], [0, M.TH(M.vmax) + 1.0], [M.TZ('female', 0) - 0.3, M.TZ('male', 0) + 2.2]],
+    terrain: [[M.TX(M.yMin) - 2.0, M.TX(M.yMax) + 2.8], [0, M.TH(M.vmax) + 1.0], [M.TZ('female', 0) - 0.3, M.TZ('male', 0) + 2.2]],
     pyramid: [[-M.PX(M.vmax) - 2.4, M.PX(M.vmax) + 0.6], [-1.4, M.PY(M.ageMax) + 1.4], [M.PZ(M.yMin), M.PZ(M.yMax) + 0.5]],
   };
   function boxDist(box, target, dir, tanV, tanH, margin = 0.94) {
@@ -440,6 +449,19 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       d = Math.max(d, cz + cx / (tanH * margin), cz + cy / (tanV * margin));
     }
     return d;
+  }
+  // 外形の投影の中心を画面中央へ寄せる（target を画面平面内で動かす）
+  function boxCenterShift(box, target, dir, dist, tanV, tanH) {
+    const f = dir, r = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), f).normalize();
+    const u = new THREE.Vector3().crossVectors(f, r);
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const x of box[0]) for (const y of box[1]) for (const z of box[2]) {
+      const q = tmpV.set(x, y, z).sub(target), dep = dist - q.dot(f);
+      const nx = q.dot(r) / (dep * tanH), ny = q.dot(u) / (dep * tanV);
+      x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny);
+    }
+    // 画面の端が ±1。中心のずれ分だけ、その奥行きで target を動かす
+    target.addScaledVector(r, (x0 + x1) / 2 * dist * tanH).addScaledVector(u, (y0 + y1) / 2 * dist * tanV);
   }
   /** 正射影の姿勢を、画角の小さい透視投影に置き換える（遷移のため） */
   function perspEquivalent(pose) {
