@@ -208,6 +208,68 @@ export function createFreeUI({ data, scene, inset, getStep, legend }) {
   };
 }
 
+/**
+ * 尾根沿いのフライトの UI：飛行中の表示 #flight-hud、flight 段の #btn-fly-again、free の #flight-cohort と #btn-fly。
+ * 凡例の「強調している世代」は、飛行中はその世代に合わせ、終わったら scene の強調に戻す。
+ */
+export function createFlightUI({ scene, legend, getStep, getForm, setForm }) {
+  const hud = $("flight-hud");
+  const btn = $("btn-fly");
+  const select = $("flight-cohort");
+  const again = $("btn-fly-again");
+  let flying = null;
+
+  function hudText(id, p) {
+    const c = COHORT_LABELS[id];
+    const k = p.kazoe ? 1 : 0;
+    const lo = Math.max(0, p.year - c.to + k), hi = Math.max(0, p.year - c.from + k);
+    const ages = lo === hi ? `${hi}歳` : `${lo}〜${hi}歳`;
+    return `${c.name}・${p.year}年・${p.kazoe ? "数え年" : ""}${ages}`;
+  }
+  function setButton() {
+    if (btn) btn.textContent = flying && getStep() === "free" ? "止める" : "尾根に沿って飛ぶ";
+  }
+  function ended() {
+    flying = null;
+    hud.hidden = true;
+    setButton();
+    legend?.setHighlight(scene.getState().highlight || []);
+  }
+  function start(id) {
+    if (!COHORT_LABELS[id]) return;
+    if (flying) stop();
+    // フライトは地形型で飛ぶ。free でピラミッド型のときは、先に形を地形型に戻す（UI の表示も合わせる）
+    if (getForm && getForm() !== "terrain") setForm?.("terrain");
+    flying = id;
+    legend?.setHighlight([id]);
+    setButton();
+    let last = "";
+    scene.fly(id, {
+      onProgress: (p) => {
+        if (flying !== id) return;
+        const t = hudText(id, p);
+        if (t !== last) { hud.textContent = t; last = t; }
+        hud.hidden = false;
+      },
+      onEnd: () => { if (flying === id) ended(); },
+    });
+    // reduced motion などで、すぐ終わったときは表示を出さない
+    if (flying !== id) hud.hidden = true;
+  }
+  function stop() {
+    if (!flying) return;
+    scene.stopFlight?.();
+    if (flying) ended();
+  }
+  btn?.addEventListener("click", () => {
+    if (getStep() !== "free") return;
+    if (flying) stop(); else start(select.value);
+  });
+  again?.addEventListener("click", () => { if (getStep() === "flight") start("dankai"); });
+  setButton();
+  return { start, stop, isFlying: () => !!flying };
+}
+
 function renderTable(data, year) {
   const details = $("data-details");
   if (!details.open) return; // 閉じている間は描かない（開いたとき toggle で描く）

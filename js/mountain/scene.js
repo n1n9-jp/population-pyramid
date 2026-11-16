@@ -11,12 +11,14 @@ import {
 } from './geometry.js';
 import { COHORTS, COHORT_IDS, cohortOfBirth, baseBirthYears, buildThreads } from './cohorts.js';
 import { LabelSet } from './labels.js';
+import { FLIGHT, buildFlightPath, surfaceHeight, localMaxHeight } from './flight.js';
 
 export const FORMS = ['terrain', 'pyramid'];
 export const CAMERA_PRESETS = ['overview', 'war', 'dankai', 'hinoeuma', 'dankai-jr', 'cut2025', 'pyramid-front', 'free'];
 export { COHORT_IDS };
 
 const FORM_MS = 700, CAM_MS = 900;
+const FLY_MS = 12000, FLY_BLEND_MS = 1400;   // フライトの既定の長さと、始めの視点からなじませる時間
 const ORTHO_EQ_FOV = 6;            // 正射影へ切り替える直前の、ほぼ平行な透視投影の画角
 const NO_CUT = 1e6;
 const FRONT_DOT = [0.9, 0.97];   // ピラミッド型を正面に近い向きで見ているとみなす、視線と z 軸の内積の範囲
@@ -117,6 +119,8 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
   const state = { form: 'terrain', camera: 'overview', cutYear: null, highlight: [...COHORT_IDS], orbit: false };
   let formT = 0;                 // 0＝地形型、1＝ピラミッド型（表示中の補間値）
   let formAnim = null, camAnim = null;
+  let flight = null;             // 飛行中のフライト（fly）
+  let restFlight = null;         // 終わったフライト（振り返りの視点で止まっている間。resize で置き直す）
   const U = { uCut: { value: NO_CUT }, uPast: { value: 0 }, uGhost: { value: 0.16 } };
   const clipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), NO_CUT);
 
@@ -415,15 +419,16 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
   function applyHighlight() {
     // ピラミッド型を正面から見ているときは、奥の年を通る糸は描かない
     const front = isFront;
-    const on = new Set(state.highlight);
-    const top = threadsOnTop();
+    // フライト中は、その世代の糸だけを強調する
+    const on = new Set(flight ? [flight.cohort] : state.highlight);
+    const top = threadsOnTop() && !flight;
     for (const c of COHORTS) for (const o of cohortThreads[c.id]) {
       o.visible = !front && on.has(c.id);
       o.material.depthTest = !top; o.renderOrder = top ? 9 : 5;
     }
     for (const o of baseThreads) o.visible = !front;
     for (const l of depthTicks) l.hidden = front;
-    const quiet = !!(PRE.terrain[state.camera] || {}).quiet;
+    const quiet = !!(PRE.terrain[state.camera] || {}).quiet || !!flight;
     for (const l of terrainTicks) l.hidden = quiet;
   }
   const threadsOnTop = () => state.form === 'terrain' && !!(PRE.terrain[state.camera] || {}).onTop;
@@ -588,7 +593,101 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
   controls.enableDamping = false;
   controls.enabled = false;
   controls.addEventListener('change', () => requestRender());
-  controls.addEventListener('start', () => { camAnim = null; });   // free で触ったら、視点の移動をやめて操作に従う
+  controls.addEventListener('start', () => { camAnim = null; restFlight = null; });   // free で触ったら、視点の移動をやめて操作に従う
+
+  /* ---- 尾根沿いのフライト ---- */
+  const DEG = THREE.MathUtils.degToRad;
+  // 飛行中の世代の糸（男性の面）。谷を通る世代（丙午・終戦前後）でも見えるよう、面より手前に太く描く
+  let flightLines = [];
+  function showFlightThread(c) {
+    hideFlightThread();
+    const births = []; for (let b = c.from; b <= c.to; b++) births.push(b);
+    const t = buildThreads(M, births, { allDashed: !!c.dashed });
+    for (const [kind, g] of [['solid', t.solid], ['dashed', t.dashed]]) {
+      const pos = [];
+      g.sex.forEach((sex, k) => { if (sex === 'male') pos.push(...g.posA.slice(k * 6, k * 6 + 6)); });
+      if (!pos.length) continue;
+      const geo = new LineSegmentsGeometry(); geo.setPositions(pos);
+      // 飛ぶたびに作り直すので、track（dispose の一覧）には入れず、hideFlightThread で捨てる
+      const mat = new LineMaterial({
+        color: new THREE.Color(COLORS.maleStrong).getHex(), worldUnits: false, linewidth: narrow() ? 3 : 3.6,
+        dashSize: 0.28, gapSize: 0.2, depthTest: false, transparent: true, opacity: 0.95, clippingPlanes: [clipPlane],
+      });
+      mat.dashed = kind === 'dashed'; mat.resolution.set(W, H); lineMats.push(mat);
+      const obj = new LineSegments2(geo, mat);
+      obj.frustumCulled = false; obj.renderOrder = 9;
+      if (mat.dashed) obj.computeLineDistances();
+      scene.add(obj); flightLines.push(obj);
+    }
+  }
+  function hideFlightThread() {
+    for (const o of flightLines) {
+      scene.remove(o); o.geometry.dispose(); o.material.dispose();
+      const i = lineMats.indexOf(o.material); if (i >= 0) lineMats.splice(i, 1);
+    }
+    flightLines = [];
+  }
+  const flyPose = (path, p) => {
+    const { pos, look } = path.poseAt(p);
+    const target = new THREE.Vector3(...look), off = new THREE.Vector3(...pos).sub(target);
+    return { ortho: false, target, dir: off.clone().normalize(), fov: FLIGHT.fov, dist: off.length() };
+  };
+  // 終わったら、尾根を振り返って全体が見える位置（2025年の側の、若い年齢の側の上）に置く
+  function lookBackPose(f) {
+    const P = f.path, b = P.box;
+    const target = new THREE.Vector3((b[0][0] + b[0][1]) / 2, b[1][1] * 0.4, (b[2][0] + b[2][1]) / 2);
+    const dir = new THREE.Vector3(P.fwd[0] * 0.6 + P.right[0] * 0.7, 0.95, P.fwd[2] * 0.6 + P.right[2] * 0.7).normalize();
+    const pts = [];
+    for (const x of b[0]) for (const y of b[1]) for (const z of b[2]) pts.push({ p: [x, y, z], hx: 0, hy: 0 });
+    const fov = f.savedFov, vf = DEG(fov) / 2, hf = Math.atan(Math.tan(vf) * W / H);
+    const dist = fitView(pts, target, dir, true, Math.tan(vf), Math.tan(hf), 0.9);
+    return { ortho: false, target, dir, fov, dist };
+  }
+  const flightInfo = (f, p) => {
+    const info = f.path.infoAt(p);
+    return { cohort: f.cohort, progress: p, birthYear: f.path.birth, year: info.year, age: info.age, value: info.value, kazoe: info.kazoe };
+  };
+  // 面にめり込まないよう、カメラの位置の近くの面より上に保つ（なじませる途中も含めて）
+  function keepAbove() {
+    const c = camera.position, floor = localMaxHeight(M, c.x, c.z, 0.3, 4) + 0.15;
+    if (c.y < floor) { c.y = floor; camera.lookAt(controls.target); camera.updateMatrixWorld(true); }
+  }
+  function stepFlight(now) {
+    const f = flight;
+    const el = now - f.start, p = clamp01(el / f.duration);
+    let pose = flyPose(f.path, p);
+    if (el < FLY_BLEND_MS && f.from) pose = lerpPose(f.from, pose, ease(el / FLY_BLEND_MS));
+    setPose(pose); keepAbove();
+    f.progress = p;
+    f.clearance = camera.position.y - surfaceHeight(M, camera.position.x, camera.position.z);
+    const info = flightInfo(f, p);
+    f.year = info.year; f.age = info.age;
+    try { f.onProgress && f.onProgress(info); } catch (e) { console.error(e); }
+    if (p >= 1) { finishFlight('end'); return false; }
+    return true;
+  }
+  /** reason：'end'（最後まで飛んだ）、'user'（canvas を触った）、'stop'（stopFlight・段の切り替え） */
+  function finishFlight(reason) {
+    const f = flight; if (!f) return;
+    flight = null;
+    hideFlightThread();
+    controls.enabled = state.orbit;
+    if (reason === 'end') {
+      restFlight = f;
+      moveTo(lookBackPose(f), true);
+    } else if (camera === persp) {
+      // 元の画角に戻す。注視点で見える高さを変えないよう、そのぶん後ろへ下がる
+      const cur = currentPose();
+      const k = Math.tan(DEG(persp.fov) / 2) / Math.tan(DEG(f.savedFov) / 2);
+      setPose({ ...cur, fov: f.savedFov, dist: cur.dist * k }); keepAbove();
+    }
+    applyHighlight(); requestRender();
+    try { f.onEnd && f.onEnd({ reason, cohort: f.cohort }); } catch (e) { console.error(e); }
+  }
+  // 飛行中に canvas を触ったら止めて、操作に戻す（capture で先に受け、同じドラッグで回転できるようにする）
+  const onFlightInterrupt = () => { if (flight) finishFlight('user'); };
+  canvas.addEventListener('pointerdown', onFlightInterrupt, { capture: true });
+  canvas.addEventListener('wheel', onFlightInterrupt, { capture: true, passive: true });
 
   /* ---- 描画ループ（必要なときだけ描く） ---- */
   let raf = 0, disposed = false;
@@ -609,6 +708,7 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       if (k >= 1) { setPose(camAnim.to); camAnim = null; }
       else { setPose(lerpPose(camAnim.from, perspEquivalent(camAnim.to), ease(k))); more = true; }
     }
+    if (flight) more = stepFlight(now) || more;
     render();
     if (more) requestRender();
   }
@@ -714,6 +814,8 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     setForm(form, { animate = true } = {}) {
       if (!FORMS.includes(form)) throw new Error('unknown form: ' + form);
       if (form === state.form && !formAnim) return;
+      if (flight) finishFlight('stop');      // フライト中は地形型に固定する。ほかの形にするときは止める
+      restFlight = null;
       state.form = form;
       applyHighlight();
       const to = form === 'pyramid' ? 1 : 0;
@@ -726,12 +828,16 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     },
     /** 視点を今の段の既定に戻す。free では、今の形を見るための既定の視点（setForm と同じ）へ移す */
     resetView({ animate = true } = {}) {
+      if (flight) finishFlight('stop');
+      restFlight = null;
       moveTo(presetPose(state.camera === 'free' ? 'overview' : state.camera, state.form), animate);
       requestRender();
     },
     /** preset: CAMERA_PRESETS のいずれか。free は今の視点のままオービット操作を有効にする */
     setCamera(preset, { animate = true } = {}) {
       if (!CAMERA_PRESETS.includes(preset)) throw new Error('unknown camera preset: ' + preset);
+      if (flight) finishFlight('stop');
+      restFlight = null;
       const wasFront = state.camera === 'pyramid-front';
       state.camera = preset;
       // free は今の視点のまま（移動中ならその行き先まで）。触ると移動をやめる
@@ -760,7 +866,7 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       requestRender();
     },
     setOrbit(enabled) {
-      state.orbit = !!enabled; controls.enabled = state.orbit;
+      state.orbit = !!enabled; controls.enabled = state.orbit && !flight;   // 飛行中は切ったまま（終わったら戻す）
       canvas.style.touchAction = state.orbit ? 'none' : '';
       if (state.orbit) { controls.update(); }
     },
@@ -769,7 +875,12 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       renderer.setPixelRatio(pixelRatio());
       renderer.setSize(W, H, false);
       for (const m of lineMats) m.resolution.set(W, H);
-      if (state.camera !== 'free') {
+      if (flight) {
+        persp.aspect = W / H; persp.updateProjectionMatrix();
+      } else if (restFlight) {
+        const p = lookBackPose(restFlight);
+        if (camAnim) camAnim.to = p; else setPose(p);
+      } else if (state.camera !== 'free') {
         const p = presetPose(state.camera, state.form);
         if (camAnim) camAnim.to = p; else if (p) setPose(p);
       } else {
@@ -778,7 +889,44 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       }
       requestRender();
     },
-    getState() { return { form: state.form, camera: state.camera, cutYear: state.cutYear, highlight: [...state.highlight] }; },
+    getState() {
+      const fl = flight ? { cohort: flight.cohort, progress: flight.progress, year: flight.year, age: flight.age, clearance: flight.clearance } : null;
+      return { form: state.form, camera: state.camera, cutYear: state.cutYear, highlight: [...state.highlight], flight: fl };
+    },
+    /**
+     * 世代の尾根に沿って飛ぶ。cohortId は COHORT_IDS のいずれか。
+     * onProgress({cohort, progress, birthYear, year, age, value, kazoe}) を毎フレーム、onEnd({reason, cohort}) を終わりに呼ぶ。
+     * reducedMotion のときは飛ばず、経路の中ほどの視点を表示して、すぐ onEnd を呼ぶ。
+     */
+    fly(cohortId, { duration = FLY_MS, onProgress, onEnd } = {}) {
+      const c = COHORTS.find(x => x.id === cohortId);
+      if (!c) throw new Error('unknown cohort: ' + cohortId);
+      if (flight) finishFlight('stop');
+      const savedFov = camera === persp ? (restFlight ? restFlight.savedFov : persp.fov) : 33;
+      restFlight = null; camAnim = null;
+      // 形は地形型に固定する（地形型へ変形している途中なら、そのまま続けさせる）
+      if (state.form !== 'terrain' || (!formAnim && formT !== 0)) {
+        state.form = 'terrain'; formAnim = null; formT = 0; applyMorph(true); applyForm(); updateCutUniforms(); applyHighlight();
+      }
+      // 世代に複数の生まれ年があるときは中央の年の糸をたどる
+      const path = buildFlightPath(M, Math.round((c.from + c.to) / 2));
+      const f = { cohort: c.id, path, duration: Math.max(1, duration), onProgress, onEnd, savedFov, progress: 0, clearance: null };
+      if (reducedMotion) {
+        setPose(flyPose(path, 0.5)); keepAbove(); render();
+        try { onProgress && onProgress(flightInfo(f, 0.5)); } catch (e) { console.error(e); }
+        try { onEnd && onEnd({ reason: 'reduced', cohort: c.id }); } catch (e) { console.error(e); }
+        return;
+      }
+      f.from = perspEquivalent(currentPose());
+      f.start = performance.now();
+      flight = f;
+      showFlightThread(c);
+      controls.enabled = false;
+      applyHighlight();
+      requestRender();
+    },
+    /** 飛行中なら止める（その場で元の画角に戻す。onEnd は reason 'stop' で呼ぶ） */
+    stopFlight() { if (flight) finishFlight('stop'); },
     /** cb(result|null, {type:'hover'|'tap', x, y})。result は {sex, birthYear, year, age, value, kazoe, source, cohort}。戻り値で解除 */
     onPick(cb) { pickListeners.add(cb); return () => pickListeners.delete(cb); },
     /** 画面上の座標で拾う（テスト・キーボード操作用） */
@@ -788,6 +936,9 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
       if (raf) cancelAnimationFrame(raf); if (hoverRaf) cancelAnimationFrame(hoverRaf);
       canvas.removeEventListener('pointermove', onMove); canvas.removeEventListener('pointerleave', onLeave);
       canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointerdown', onFlightInterrupt, { capture: true });
+      canvas.removeEventListener('wheel', onFlightInterrupt, { capture: true });
+      flight = null; hideFlightThread();
       controls.dispose(); clearCut(); if (frameObj) frameObj.geometry.dispose();
       for (const o of disposables) o.dispose && o.dispose();
       labels.dispose(); pickListeners.clear();
@@ -797,7 +948,10 @@ export function createMountain({ canvas, data, reducedMotion = false }) {
     _debug: {
       model: M, presets: PRE,
       project(p) { const v = new THREE.Vector3(...p).project(camera); return { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H }; },
-      isAnimating: () => !!(formAnim || camAnim),
+      isAnimating: () => !!(formAnim || camAnim || flight),
+      /** 地形型の面の高さ（フライトの確認用） */
+      surfaceHeight: (x, z) => surfaceHeight(M, x, z),
+      cameraPosition: () => camera.position.toArray(),
       /** 補間値を固定して描く（確認用。次の setForm で元に戻る） */
       setFormT(t) { formAnim = null; formT = t; applyMorph(true); applyForm(); updateCutUniforms(); render(); },
     },

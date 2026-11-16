@@ -40,6 +40,7 @@
         <p>お使いの環境では3D表示を使えないため、静止画を表示しています。全国ページの人口ピラミッドは、そのままご利用いただけます。</p>
       </div>
       <div id="pick-tooltip" class="pick-tooltip" role="tooltip" hidden></div>
+      <p id="flight-hud" class="flight-hud" aria-live="off" hidden></p>
       <p class="scroll-hint" aria-hidden="true">↓ スクロールして読む</p>
     </div>
 
@@ -79,6 +80,14 @@
         <h2 id="h-dankai-jr">団塊ジュニア：第2次ベビーブーム</h2>
         <p>団塊の世代の子どもにあたる1971〜1974年生まれは「団塊ジュニア」と呼ばれ、第2次ベビーブームを作りました。出生数は1971年に2,000,973人、1972年に2,038,682人、1973年に2,091,983人、1974年に2,029,989人で、1973年が最多です（<a href="https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei25/dl/05_gaikyouR07.pdf" target="_blank" rel="noopener">厚生労働省「人口動態統計」</a>）。1947〜1972年の出生数には沖縄県を含みません。</p>
         <p>2025年には51〜54歳で、合わせて約<span data-calc="jr-2025">791万人</span>です。</p>
+      </section>
+
+      <section class="scene-step" data-step="flight" aria-labelledby="h-flight">
+        <h2 id="h-flight">団塊の世代の尾根に沿って飛ぶ</h2>
+        <p class="d3-only">団塊の世代（1947〜49年生まれ）の糸に沿って、男性の面の尾根のすぐ脇を低く飛びます。生まれた年から2025年まで、この世代が年齢を重ねていく道のりを、尾根の際からたどります。</p>
+        <p class="d3-only">左に見える高い尾根が団塊の世代、右の谷とその先の尾根が、後から生まれた世代です。画面に触れると止まります。</p>
+        <p class="fallback-only">対応した環境では、団塊の世代の尾根に沿って、生まれた年から2025年まで低く飛ぶ視点を表示します。</p>
+        <p class="d3-only"><button type="button" id="btn-fly-again" class="btn-reset">もう一度飛ぶ</button></p>
       </section>
 
       <section class="scene-step" data-step="cut2025" aria-labelledby="h-cut2025">
@@ -123,6 +132,18 @@
             <label><input type="checkbox" data-cohort="dankai-jr" checked> 団塊ジュニア（1971〜74年生まれ）</label>
             <label><input type="checkbox" data-cohort="postwar" checked> 終戦前後（1945〜46年生まれ・破線）</label>
           </fieldset>
+          <div class="ctl-group d3-only">
+            <label class="ctl-label" for="flight-cohort">世代の尾根に沿って飛ぶ</label>
+            <div class="fly-row">
+              <select id="flight-cohort">
+                <option value="dankai">団塊の世代（1947〜49年生まれ）</option>
+                <option value="hinoeuma">丙午（1966年生まれ）</option>
+                <option value="dankai-jr">団塊ジュニア（1971〜74年生まれ）</option>
+                <option value="postwar">終戦前後（1945〜46年生まれ）</option>
+              </select>
+              <button type="button" id="btn-fly" class="btn-reset">尾根に沿って飛ぶ</button>
+            </div>
+          </div>
           <div class="ctl-group d3-only">
             <button type="button" id="btn-reset-view" class="btn-reset">視点を戻す</button>
           </div>

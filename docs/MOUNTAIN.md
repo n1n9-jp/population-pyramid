@@ -44,13 +44,22 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
     - `setOrbit(enabled)`
     - `resize(w, h)`
     - `resetView({animate})`：視点を今の段の既定に戻す。free では、今の形を見るための既定の視点（地形型は overview、ピラミッド型は斜めから全体）へ移す。ボタンはページ側が付ける。
-    - `getState()`：`{form, camera, cutYear, highlight}` を返す
+    - `getState()`：`{form, camera, cutYear, highlight, flight}` を返す。`flight` は飛行中なら `{cohort, progress, year, age, clearance}`（`clearance` はカメラの高さと、その位置の面の高さの差。確認用）、それ以外は `null`
+    - `fly(cohortId, {duration, onProgress, onEnd})`：世代の尾根に沿って飛ぶ（下の「尾根沿いのフライト」）。`duration` の既定は 12000ms。`onProgress({cohort, progress, birthYear, year, age, value, kazoe})` を毎フレーム、`onEnd({reason, cohort})` を終わりに1回呼ぶ。reason は `end`（最後まで飛んだ）、`user`（canvas を触った）、`stop`（stopFlight・setCamera・ピラミッド型への setForm）、`reduced`（reduced motion）
+    - `stopFlight()`：飛行中なら止める。その場で元の画角に戻す
     - `onPick(cb)`：`cb(result|null, {type:'hover'|'tap', x, y})`。ホバー（マウス）で出したものは、ポインタが canvas から出ると `null` で消す。タップで出したものは、次のタップまで残す（何もない所をタップすると `cb(null, {type:'tap'})`）。タッチの pointerleave では消さない。
     - `dispose()`
   - カメラのプリセット：`overview`、`war`、`dankai`、`hinoeuma`、`dankai-jr`、`cut2025`、`pyramid-front`、`free`。
     - free の段で `setForm` を呼ぶと、その形を見るための既定の視点へなめらかに移る（`resetView` と同じ行き先）。free で canvas を触ると、移動をやめて操作に従う。
     - 断面より奥の年を淡くする処理と、奥の年を通る糸を隠す処理は、カメラの名前ではなく「form が pyramid で、正面（z 軸の向き）に近い視線」のときに掛ける。free で正面から見た場合も同じ。
     - 世代を追う段（war・dankai・hinoeuma・dankai-jr）では、主役の糸が谷の底で手前の尾根に隠れないよう、強調の糸を面より手前に描く。
+    - **尾根沿いのフライト**（`fly`）
+      - 経路は、その世代の糸（男性の面。生まれ年が複数ある世代は中央の年）に沿う。生まれた年から2025年まで。1941〜43年のすき間は両隣の年の点を結んで止まらずに飛び越え、数え年の年（1944〜46年）は糸と同じく a = y − b + 1 の点を通る。
+      - カメラは、同じ年のまま若い年齢の側（手前）へ少し離れ、尾根（糸）より少し高く、かつ近くの面の高さの最大値より上を飛ぶ。視線は少し先の経路の点を糸の側へ寄せた点に向ける。位置・高さ・視線は移動平均でなめらかにし、高さは「最大値で膨らませてから平均」して、必要な高さを下回らないようにする。
+      - 飛行中は形を terrain に固定し（ピラミッド型なら地形型に戻す）、オービット操作を切る。その世代の糸（男性の面）を面より手前に太く描き、ほかの強調の糸は隠す。透視投影の画角は広め（58°）にし、終わったら元の画角に戻す。
+      - 最後まで飛んだら、尾根を振り返って全体が見える位置へなめらかに移って止まる。
+      - 飛行中に canvas をドラッグ・タップ（またはホイール）すると止まり、その段のオービット操作（free なら有効）に戻る。
+      - reducedMotion のときは飛ばない。経路の中ほどの視点を表示し、onEnd をすぐ呼ぶ。
     - 各プリセットは、見せる範囲と、その近くの目盛りの文字がキャンバスに収まる距離に置く。文字はキャンバスの端で切れるときと、優先度の高い文字に重なるときは出さない。
   - js/mountain/geometry.js など、補助のファイルは自由に分けてよい。
 - **js/mountain/{main,tour,ui,inset}.js、mountain.html、css/mountain.css**（M2）
@@ -69,9 +78,14 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
 | dankai | terrain | dankai | dankai | なし |
 | hinoeuma | terrain | hinoeuma | hinoeuma | なし |
 | dankai-jr | terrain | dankai-jr | dankai-jr | なし |
+| flight | terrain | dankai（飛ぶ前と止めたとき） | dankai | なし |
 | cut2025 | terrain → pyramid | cut2025 → pyramid-front | すべて | 2025 |
 | free | 現状のまま | free（オービット操作を有効にする） | 選択に従う | スライダー |
 
+- **flight の段**：段に入ったら、団塊の世代（`dankai`）のフライトを自動で1回始める。段の中に「もう一度飛ぶ」ボタン `#btn-fly-again` を置く。段を離れたら止める。
+  - 飛行中は canvas の上に `#flight-hud`（aria-live="off"）を出す。文言は「団塊の世代・1975年・26〜28歳」の形（年と年齢は onProgress から。年齢はその世代の生まれ年の幅で、数え年の年は「数え年」を付ける）。終わったら隠す。
+  - 凡例の「強調している世代」は、飛行中はその世代に合わせ、終わったら段（free では選択）の強調に戻す。
+  - WebGL が使えないとき（body[data-fallback]）は、段の文言を「対応した環境では…」に変え、ボタンを隠す。
 - 解説文は短く書く（各段2〜4文）。数値は data/pyramid.json から計算できる値と、全国ページの解説文に出典付きで載っている値だけを使う。
 - **free で使う UI**
   - 形の切り替え：`#form-toggle button[data-form]`（aria-pressed）
@@ -83,6 +97,7 @@ Git の手順は docs/PLAN.md §5 と同じ。ブランチは `claude/sharp-newt
     - スライダーの操作、free 以外の段へのスクロール、タブが隠れたときに止める。再生中は年のラベルの aria-live を off にし、止めたら polite に戻す。
     - reduced motion でも再生できる（変形やカメラの遷移はしない）。
   - 強調する世代の選択：`#cohort-select input[data-cohort]`
+  - 尾根沿いのフライト：世代を選ぶ `#flight-cohort`（select。4世代）と `#btn-fly`（「尾根に沿って飛ぶ」／飛行中は「止める」）。ピラミッド型のときは地形型に戻してから飛ぶ。
   - 断面の2D小窓：`#inset`。中は SVG で、棒は `rect.inset-bar[data-sex][data-age][data-value]`。
     - 小窓は全国ページと同じく、各年の `openAge` の段も棒（`.inset-open`、淡く描く）で出す。面（3D）には含めない。E2E は「openAge の段は `.inset-open` であること」を確かめる。
     - 小窓の年齢の目盛りは、棒より後に描き、隠れないようにする。

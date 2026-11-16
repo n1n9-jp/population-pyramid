@@ -25,6 +25,7 @@ body[data-step="war"] .scene-step[data-step="war"],
 body[data-step="dankai"] .scene-step[data-step="dankai"],
 body[data-step="hinoeuma"] .scene-step[data-step="hinoeuma"],
 body[data-step="dankai-jr"] .scene-step[data-step="dankai-jr"],
+body[data-step="flight"] .scene-step[data-step="flight"],
 body[data-step="cut2025"] .scene-step[data-step="cut2025"],
 body[data-step="free"] .scene-step[data-step="free"] { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .scene-step { transition: none; } }
@@ -140,6 +141,23 @@ body[data-step="free"] .scene-step[data-step="free"] { color: var(--ink); }
 .sw-kazoe { background: repeating-linear-gradient(90deg, rgba(157, 185, 217, .4) 0 11px, rgba(255, 197, 110, .4) 11px 22px); }
 .sw-gap { border: 1px dashed var(--muted); background: #fff; }
 body[data-fallback] .m-legend, body[data-fallback] .d3-only { display: none; }
+.fallback-only { display: none; }
+body[data-fallback] .fallback-only { display: block; }
+
+/* 尾根沿いのフライト */
+.flight-hud {
+  position: absolute; z-index: 4; left: 50%; bottom: 14px; transform: translateX(-50%); margin: 0;
+  max-width: calc(100% - 24px); padding: 6px 12px; border-radius: 6px; pointer-events: none;
+  background: rgba(255, 253, 246, .94); border: 1px solid var(--grid); color: var(--ink);
+  font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.fly-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fly-row select {
+  flex: 1 1 200px; min-width: 0; min-height: 44px; padding: 0 8px; border: 1px solid var(--muted); border-radius: 6px;
+  background: #fffdf6; color: var(--ink); font: inherit; font-size: 14px;
+}
+.scene-step .btn-reset { margin-top: 4px; }
 .btn-reset {
   min-height: 44px; padding: 0 16px; border: 1px solid var(--muted); border-radius: 6px; background: #fffdf6;
   color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;

@@ -25,7 +25,7 @@ const DESKTOP = { viewport: { width: 1280, height: 900 }, reducedMotion: 'no-pre
 const DESKTOP_REDUCED = { viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' };
 const MOBILE = { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' };
 
-const STEPS = ['overview', 'war', 'dankai', 'hinoeuma', 'dankai-jr', 'cut2025', 'free'];
+const STEPS = ['overview', 'war', 'dankai', 'hinoeuma', 'dankai-jr', 'flight', 'cut2025', 'free'];
 const ALL_IDS = ['dankai', 'hinoeuma', 'dankai-jr', 'postwar'];
 // MOUNTAIN.md §5 の表。hl: 'all' は「すべて」＝4世代すべて、null は検査しない。
 const EXPECT = {
@@ -34,6 +34,7 @@ const EXPECT = {
   dankai: { form: 'terrain', camera: 'dankai', hl: ['dankai'], cut: null },
   hinoeuma: { form: 'terrain', camera: 'hinoeuma', hl: ['hinoeuma'], cut: null },
   'dankai-jr': { form: 'terrain', camera: 'dankai-jr', hl: ['dankai-jr'], cut: null },
+  flight: { form: 'terrain', camera: 'dankai', hl: ['dankai'], cut: null },
   cut2025: { form: 'pyramid', camera: 'pyramid-front', hl: 'all', cut: 2025 },
 };
 
@@ -179,7 +180,7 @@ async function main() {
       assert(r.ratio >= 0.03, `白でない画素の割合=${(r.ratio * 100).toFixed(2)}% (${r.w}x${r.h})`);
     });
 
-    await check('3. ツアー：7段を順にスクロールすると body[data-step] と getState() が §5 の表に一致する', async () => {
+    await check('3. ツアー：8段を順にスクロールすると body[data-step] と getState() が §5 の表に一致する', async () => {
       const steps = await dp.$$eval('.scene-step[data-step]', (els) => els.map((e) => e.dataset.step));
       assert(JSON.stringify(steps) === JSON.stringify(STEPS), `段の並び=${JSON.stringify(steps)} 期待=${JSON.stringify(STEPS)}`);
       const bad = [];
@@ -529,6 +530,124 @@ async function main() {
     });
     await f.ctx.close();
 
+    // ---- 12: 尾根沿いのフライト ----
+    const fl = await openPage(browser, DESKTOP, 'flight', 'step=flight');
+    const flp = fl.page;
+    const flightOf = () => flp.evaluate(() => window.__mountain.scene.getState().flight);
+    const hudOf = () => flp.evaluate(() => { const h = document.getElementById('flight-hud'); return { shown: !!h && !h.hidden && h.getClientRects().length > 0, text: h ? h.textContent : '' }; });
+    await check('12a. ?step=flight：フライトが始まり、progress が時間とともに増え、終わると null に戻る。#flight-hud が見え、年が進む', async () => {
+      await waitBodyStep(flp, 'flight');
+      await flp.waitForFunction(() => window.__mountain.scene.getState().flight !== null, null, { timeout: 5000 });
+      const f0 = await flightOf();
+      assert(f0.cohort === 'dankai', `cohort=${f0.cohort}`);
+      const h0 = await hudOf();
+      await sleep(2500);
+      const f1 = await flightOf();
+      const h1 = await hudOf();
+      assert(f1 && f1.progress > f0.progress, `progress が増えない: ${f0.progress} → ${f1 && f1.progress}`);
+      const bad = [];
+      if (!h0.shown || !h1.shown) bad.push(`#flight-hud が見えない: ${JSON.stringify([h0, h1])}`);
+      const yr = (t) => Number((/(\d{4})年/.exec(t) || [])[1]);
+      if (!(yr(h1.text) > yr(h0.text))) bad.push(`#flight-hud の年が進まない: ${h0.text} → ${h1.text}`);
+      if (!/^団塊の世代・\d{4}年・(数え年)?\d+(〜\d+)?歳$/.test(h1.text)) bad.push(`#flight-hud の書式: ${h1.text}`);
+      if (await flp.getAttribute('#flight-hud', 'aria-live') !== 'off') bad.push('#flight-hud の aria-live が off でない');
+      const legend = await flp.evaluate(() => document.getElementById('legend').textContent);
+      if (!legend.includes('団塊の世代')) bad.push(`凡例が飛行中の世代に合っていない: ${legend}`);
+      await flp.waitForFunction(() => window.__mountain.scene.getState().flight === null, null, { timeout: 16000 });
+      await sleep(100);
+      if ((await hudOf()).shown) bad.push('終わったあとも #flight-hud が出ている');
+      assert(bad.length === 0, bad.join('\n'));
+    });
+    if (!args.stub) {
+      await check('12b. フライト中、カメラは面にめり込まない（数点で、カメラの高さがその位置の面の高さより上）', async () => {
+        await flp.click('#btn-fly-again');
+        await flp.waitForFunction(() => window.__mountain.scene.getState().flight !== null, null, { timeout: 3000 });
+        const bad = [];
+        let n = 0;
+        while (n < 12) {
+          await sleep(700);
+          const v = await flp.evaluate(() => {
+            const sc = window.__mountain.scene, st = sc.getState();
+            const [x, y, z] = sc._debug.cameraPosition();
+            return { fl: st.flight, x, y, z, ground: sc._debug.surfaceHeight(x, z) };
+          });
+          if (!v.fl) break;
+          n++;
+          if (!(v.y > v.ground) || !(v.fl.clearance > 0)) bad.push(`progress=${v.fl.progress.toFixed(2)}: カメラ y=${v.y.toFixed(3)} 面=${v.ground.toFixed(3)} clearance=${v.fl.clearance}`);
+        }
+        if (n < 5) bad.push(`確かめた点が${n}点しかない`);
+        assert(bad.length === 0, bad.join('\n'));
+        await flp.waitForFunction(() => window.__mountain.scene.getState().flight === null, null, { timeout: 16000 });
+      });
+    }
+    await check('12c. #btn-fly-again で再び始まる。段を離れると止まる', async () => {
+      await flp.waitForFunction(() => window.__mountain.scene.getState().flight === null, null, { timeout: 16000 });
+      await flp.click('#btn-fly-again');
+      await flp.waitForFunction(() => { const f = window.__mountain.scene.getState().flight; return f && f.cohort === 'dankai'; }, null, { timeout: 3000 });
+      await scrollToStep(flp, 'cut2025');
+      await waitBodyStep(flp, 'cut2025');
+      await flp.waitForFunction(() => window.__mountain.scene.getState().flight === null, null, { timeout: 3000 });
+      assert(!(await hudOf()).shown, '段を離れたあとも #flight-hud が出ている');
+    });
+    await check('12d. free：#flight-cohort を hinoeuma にして #btn-fly を押すとその世代で始まり、もう一度押すと止まる', async () => {
+      await scrollToStep(flp, 'free');
+      await waitBodyStep(flp, 'free');
+      await flp.click('#form-toggle button[data-form="pyramid"]');
+      await flp.selectOption('#flight-cohort', 'hinoeuma');
+      const label0 = (await flp.textContent('#btn-fly')).trim();
+      await flp.click('#btn-fly');
+      await flp.waitForFunction(() => { const f = window.__mountain.scene.getState().flight; return f && f.cohort === 'hinoeuma'; }, null, { timeout: 3000 });
+      const bad = [];
+      if (label0 !== '尾根に沿って飛ぶ') bad.push(`押す前のボタン=${label0}`);
+      const label1 = (await flp.textContent('#btn-fly')).trim();
+      if (label1 !== '止める') bad.push(`飛行中のボタン=${label1}`);
+      const st = await getState(flp);
+      if (st.form !== 'terrain') bad.push(`飛行中の形=${st.form}（地形型に固定するはず）`);
+      if (await flp.getAttribute('body', 'data-form') !== 'terrain') bad.push('body[data-form] が terrain でない');
+      if (await flp.getAttribute('#form-toggle button[data-form="terrain"]', 'aria-pressed') !== 'true') bad.push('形の切り替えの表示が地形型でない');
+      const legend = await flp.evaluate(() => document.getElementById('legend').textContent);
+      if (!legend.includes('丙午') || legend.includes('団塊ジュニア')) bad.push(`凡例が飛行中の世代に合っていない: ${legend.replace(/\s+/g, ' ')}`);
+      await sleep(1200);
+      if (!/^丙午・\d{4}年・(数え年)?\d+歳$/.test((await hudOf()).text)) bad.push(`#flight-hud=${(await hudOf()).text}`);
+      await flp.click('#btn-fly');
+      await flp.waitForFunction(() => window.__mountain.scene.getState().flight === null, null, { timeout: 3000 });
+      const label2 = (await flp.textContent('#btn-fly')).trim();
+      if (label2 !== '尾根に沿って飛ぶ') bad.push(`止めたあとのボタン=${label2}`);
+      if ((await getState(flp)).camera !== 'free') bad.push('止めたあと camera が free でない');
+      assert(bad.length === 0, bad.join('\n'));
+    });
+    await check('12e. 飛行中に canvas を触ると止まる', async () => {
+      await flp.click('#btn-fly');
+      await flp.waitForFunction(() => window.__mountain.scene.getState().flight !== null, null, { timeout: 3000 });
+      await sleep(500);
+      const box = await flp.locator('canvas#mountain-canvas').boundingBox();
+      await flp.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+      await flp.mouse.down();
+      await flp.mouse.move(box.x + box.width * 0.5 + 40, box.y + box.height * 0.5, { steps: 4 });
+      await flp.mouse.up();
+      await flp.waitForFunction(() => window.__mountain.scene.getState().flight === null, null, { timeout: 3000 });
+      assert((await flp.textContent('#btn-fly')).trim() === '尾根に沿って飛ぶ', 'ボタンが元に戻らない');
+    });
+    await fl.ctx.close();
+
+    const flr = await openPage(browser, DESKTOP_REDUCED, 'flight-reduced', 'step=flight');
+    await check('12f. reduced motion：flight の段では飛ばず、すぐ終わる（getState().flight が null、#flight-hud は出ない）', async () => {
+      await waitBodyStep(flr.page, 'flight');
+      const bad = [];
+      for (let i = 0; i < 4; i++) {
+        const f = (await getState(flr.page)).flight;
+        if (f !== null) bad.push(`${i * 150}ms: flight=${JSON.stringify(f)}`);
+        await sleep(150);
+      }
+      await flr.page.click('#btn-fly-again');
+      await sleep(50);
+      if ((await getState(flr.page)).flight !== null) bad.push('もう一度飛ぶの後に flight が null でない');
+      const hud = await flr.page.evaluate(() => !document.getElementById('flight-hud').hidden);
+      if (hud) bad.push('#flight-hud が出ている');
+      assert(bad.length === 0, bad.join('\n'));
+    });
+    await flr.ctx.close();
+
     // ---- 5: ?step=war ----
     const w = await openPage(browser, DESKTOP, 'war', 'step=war');
     await check('5. ?step=war で開くと、その段から始まる', async () => {
@@ -582,16 +701,18 @@ async function main() {
       assert(txt.length > 0, '#webgl-fallback に案内文がない');
       const errs = nw.mine.filter((m) => m.includes('pageerror'));
       assert(errs.length === 0, errs.join('\n'));
-      assert(await nw.page.locator('.scene-step[data-step]').count() === STEPS.length, '段落が7つ残っていない');
+      assert(await nw.page.locator('.scene-step[data-step]').count() === STEPS.length, '段落が8つ残っていない');
       const vis = await nw.page.evaluate(() => {
         const v = (sel) => { const e = document.querySelector(sel); return !!e && e.getClientRects().length > 0; };
-        return { lede: v('.lede .d3-only'), form: v('#form-toggle'), cohort: v('#cohort-select'), reset: v('#btn-reset-view'), slider: v('#cut-slider'), inset: v('#inset'), table: v('#data-details'), legend: v('#legend') };
+        return { lede: v('.lede .d3-only'), form: v('#form-toggle'), cohort: v('#cohort-select'), reset: v('#btn-reset-view'), fly: v('#btn-fly'), flyAgain: v('#btn-fly-again'), flightFallback: v('.scene-step[data-step="flight"] .fallback-only'), slider: v('#cut-slider'), inset: v('#inset'), table: v('#data-details'), legend: v('#legend') };
       });
       const bad = [];
       if (vis.lede) bad.push('「スクロールすると…」が残っている');
       if (vis.form) bad.push('形の切り替えが残っている');
       if (vis.cohort) bad.push('強調する世代が残っている');
       if (vis.reset) bad.push('視点を戻すが残っている');
+      if (vis.fly || vis.flyAgain) bad.push('フライトのボタンが残っている');
+      if (!vis.flightFallback) bad.push('flight の段に「対応した環境では…」の文言が出ていない');
       if (!vis.slider || !vis.inset || !vis.table) bad.push(`断面スライダー・小窓・データ表が消えている: ${JSON.stringify(vis)}`);
       assert(bad.length === 0, bad.join('\n'));
     });
