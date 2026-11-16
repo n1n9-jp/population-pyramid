@@ -7,6 +7,8 @@ export const STEPS = {
   dankai: { form: "terrain", camera: "dankai", highlight: ["dankai"], cut: null },
   hinoeuma: { form: "terrain", camera: "hinoeuma", highlight: ["hinoeuma"], cut: null },
   "dankai-jr": { form: "terrain", camera: "dankai-jr", highlight: ["dankai-jr"], cut: null },
+  // 段に入ったら、団塊の世代の尾根に沿って1回飛ぶ（scene.fly）。カメラは飛ぶ前と、止めたときの視点
+  flight: { form: "terrain", camera: "dankai", highlight: ["dankai"], cut: null, fly: "dankai" },
   // terrain（cut2025）→ pyramid（pyramid-front）。後半は dwell 後に切り替える
   cut2025: { form: "terrain", camera: "cut2025", highlight: ALL_COHORTS, cut: 2025, then: { form: "pyramid", camera: "pyramid-front" } },
   free: { form: null, camera: "free", highlight: null, cut: null, orbit: true },
@@ -14,10 +16,10 @@ export const STEPS = {
 
 // 強調する世代の名前（凡例に出す）
 export const COHORT_LABELS = {
-  dankai: { name: "団塊の世代", range: "1947〜49年生まれ" },
-  hinoeuma: { name: "丙午", range: "1966年生まれ" },
-  "dankai-jr": { name: "団塊ジュニア", range: "1971〜74年生まれ" },
-  postwar: { name: "終戦前後", range: "1945〜46年生まれ" },
+  dankai: { name: "団塊の世代", range: "1947〜49年生まれ", from: 1947, to: 1949 },
+  hinoeuma: { name: "丙午", range: "1966年生まれ", from: 1966, to: 1966 },
+  "dankai-jr": { name: "団塊ジュニア", range: "1971〜74年生まれ", from: 1971, to: 1974 },
+  postwar: { name: "終戦前後", range: "1945〜46年生まれ", from: 1945, to: 1946 },
 };
 
 // canvas の aria-label（段に合わせる）
@@ -28,6 +30,7 @@ export const CANVAS_LABELS = {
   dankai: `${BASE}。団塊の世代（1947〜49年生まれ）の糸`,
   hinoeuma: `${BASE}。丙午（1966年生まれ）の糸`,
   "dankai-jr": `${BASE}。団塊ジュニア（1971〜74年生まれ）の糸`,
+  flight: `${BASE}。団塊の世代の尾根に沿って、生まれた年から2025年まで低く飛ぶ視点`,
   cut2025: `${BASE}。2025年の断面から人口ピラミッドになる`,
   free: `${BASE}。自由に動かせる表示。ドラッグで回転、ホイールで拡大・縮小`,
 };
@@ -37,8 +40,9 @@ const THEN_DELAY_MS = 800;
 /**
  * @param scene  createMountain の戻り値
  * @param free   { getCut(), getHighlight(), setCut(y), setForm(f) }  free の状態を持つ ui
+ * @param flight { start(cohort), stop() }  尾根沿いのフライトの ui（createFlightUI）
  */
-export function createTour({ scene, free, reducedMotion, legend }) {
+export function createTour({ scene, free, reducedMotion, legend, flight }) {
   const animate = !reducedMotion;
   let current = null;
   let form = "terrain";
@@ -67,6 +71,8 @@ export function createTour({ scene, free, reducedMotion, legend }) {
     const s = STEPS[id];
     if (!s || id === current) return;
     clearTimeout(timer);
+    flight?.stop();
+    free.onStep?.(id);
     current = id;
     document.body.dataset.step = id;
     const cv = document.getElementById("mountain-canvas");
@@ -82,6 +88,7 @@ export function createTour({ scene, free, reducedMotion, legend }) {
     const hl = s.highlight ?? free.getHighlight();
     scene.setHighlight(hl);
     legend?.setHighlight(hl);
+    if (s.fly) flight?.start(s.fly);
     if (s.then && !reducedMotion) {
       timer = setTimeout(() => {
         if (current !== id) return;

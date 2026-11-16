@@ -25,6 +25,7 @@ body[data-step="war"] .scene-step[data-step="war"],
 body[data-step="dankai"] .scene-step[data-step="dankai"],
 body[data-step="hinoeuma"] .scene-step[data-step="hinoeuma"],
 body[data-step="dankai-jr"] .scene-step[data-step="dankai-jr"],
+body[data-step="flight"] .scene-step[data-step="flight"],
 body[data-step="cut2025"] .scene-step[data-step="cut2025"],
 body[data-step="free"] .scene-step[data-step="free"] { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .scene-step { transition: none; } }
@@ -44,7 +45,31 @@ body[data-step="free"] .scene-step[data-step="free"] { color: var(--ink); }
 .seg button:first-child { border-radius: 6px 0 0 6px; }
 .seg button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
 .seg button[aria-pressed="true"] { background: var(--male-strong); border-color: var(--male-strong); color: #fff; font-weight: 700; }
-#cut-slider { width: 100%; height: 32px; margin: 0; accent-color: var(--male-strong); cursor: pointer; }
+.cut-controls { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 12px; }
+.cut-timeline { position: relative; flex: 1 1 220px; min-width: 0; height: 66px; }
+.cut-timeline svg { position: absolute; left: 0; top: 0; width: 100%; height: 66px; pointer-events: none; display: block; }
+.cut-timeline text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+.cut-timeline .cut-rail { stroke: var(--grid); stroke-width: 2; }
+.cut-timeline .cut-tick { stroke: var(--muted); stroke-opacity: .8; stroke-width: 1; shape-rendering: crispEdges; }
+.cut-timeline .cut-gap { stroke: var(--muted); stroke-opacity: .5; stroke-width: 1; }
+.cut-timeline .cut-hatch { stroke: var(--muted); stroke-opacity: .6; stroke-width: 1.5; }
+.cut-timeline .cut-pill { fill: #fffdf6; stroke: var(--male-strong); stroke-width: 1.5; }
+.cut-timeline .cut-year-label { fill: var(--ink); font-size: 13px; font-weight: 700; }
+#cut-slider {
+  position: absolute; left: 8px; top: 20px; width: calc(100% - 16px); height: 28px; margin: 0; padding: 0;
+  background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; accent-color: var(--male-strong);
+}
+#cut-slider::-webkit-slider-runnable-track { height: 28px; background: transparent; }
+#cut-slider::-moz-range-track { height: 28px; background: transparent; }
+#cut-slider::-moz-range-progress { background: transparent; }
+#cut-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 28px; border-radius: 4px;
+  background: var(--male-strong); border: 2px solid #fffdf6; box-shadow: 0 0 0 1px var(--muted);
+}
+#cut-slider::-moz-range-thumb {
+  width: 12px; height: 24px; border-radius: 4px; background: var(--male-strong);
+  border: 2px solid #fffdf6; box-shadow: 0 0 0 1px var(--muted);
+}
 
 .inset { width: 100%; max-width: 360px; background: #fffdf6; border: 1px solid var(--grid); }
 .inset-svg { display: block; width: 100%; height: auto; }
@@ -116,6 +141,23 @@ body[data-step="free"] .scene-step[data-step="free"] { color: var(--ink); }
 .sw-kazoe { background: repeating-linear-gradient(90deg, rgba(157, 185, 217, .4) 0 11px, rgba(255, 197, 110, .4) 11px 22px); }
 .sw-gap { border: 1px dashed var(--muted); background: #fff; }
 body[data-fallback] .m-legend, body[data-fallback] .d3-only { display: none; }
+.fallback-only { display: none; }
+body[data-fallback] .fallback-only { display: block; }
+
+/* 尾根沿いのフライト */
+.flight-hud {
+  position: absolute; z-index: 4; left: 50%; bottom: 14px; transform: translateX(-50%); margin: 0;
+  max-width: calc(100% - 24px); padding: 6px 12px; border-radius: 6px; pointer-events: none;
+  background: rgba(255, 253, 246, .94); border: 1px solid var(--grid); color: var(--ink);
+  font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.fly-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fly-row select {
+  flex: 1 1 200px; min-width: 0; min-height: 44px; padding: 0 8px; border: 1px solid var(--muted); border-radius: 6px;
+  background: #fffdf6; color: var(--ink); font: inherit; font-size: 14px;
+}
+.scene-step .btn-reset { margin-top: 4px; }
 .btn-reset {
   min-height: 44px; padding: 0 16px; border: 1px solid var(--muted); border-radius: 6px; background: #fffdf6;
   color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;

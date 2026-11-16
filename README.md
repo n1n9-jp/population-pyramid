@@ -2,15 +2,28 @@
 
 日本の人口を各歳・男女別に、1920年から2025年までアニメーションで見せる静的サイトです。米国勢調査局の可視化 [Population Pyramid of the United States（055）](https://www.census.gov/dataviz/visualizations/055/) と同じ体験を、日本のデータで再現しています。ビルド工程はなく、HTML・CSS・JavaScript（ES modules）と D3 v7.9.0（CDN）だけで動きます。
 
+## 公開URLとページ構成
+
+公開URLは <https://population-pyramid.structure-and-representation.com/>（GitHub Pages、`main` ブランチ）です。表に出すのは3Dページ（`index.html`）だけです。2Dの2ページは、他ページからリンクせず `noindex` にしていますが、URLを直接開けば見られます。
+
+| ページ | ファイル | URL |
+|---|---|---|
+| 3D「人口の山脈とコホートの糸」（公開の入口） | `index.html` | `/` |
+| 全国の各歳別ピラミッド（2D） | `national.html` | `/national.html` |
+| 都道府県・地方別（2D） | `regions.html` | `/regions.html` |
+| 古いURLの転送 | `mountain.html` | `/mountain.html` → `/`（`?step=` などのクエリを引き継ぐ） |
+
+2Dの2ページには、3Dページへ戻るリンク（「← 人口の山脈（3D）へ」）だけを置いています。
+
 ## ローカルで見る
 
-リポジトリ直下で次を実行し、<http://localhost:8000/> を開きます。`file://` で直接開くと JSON を読み込めないため、必ずサーバー経由で開いてください。
+リポジトリ直下で次を実行し、<http://localhost:8000/>（3D）を開きます。全国の2Dは <http://localhost:8000/national.html> です。`file://` で直接開くと JSON を読み込めないため、必ずサーバー経由で開いてください。
 
 ```sh
 python3 -m http.server 8000
 ```
 
-`?year=1950` のように URL で年を指定できます。`?fixture=1` を付けると、サンプルデータ（`tests/fixtures/pyramid.fixture.json`）で表示します。
+全国の2Dページ（`national.html`）では、`?year=1950` のように URL で年を指定できます。`?fixture=1` を付けると、サンプルデータ（`tests/fixtures/pyramid.fixture.json`）で表示します。
 
 GitHub Pages で公開する場合は、`main` にマージ後、Settings → Pages → Source: Deploy from a branch → Branch: `main` / (root) を選びます。
 
@@ -77,9 +90,9 @@ node tests/e2e/regions.cjs --base http://localhost:8000
 
 `data/regions.json`、`data/regions_by_age.csv`、`data/regions_build_report.json` が生成されます。終了コードは 0=合格、1=検証FAIL、2=取得失敗です。`build_data.py` と `build_regions.py` は `data/sources.lock.json` を共有し、互いのキーを消しません。
 
-## 3Dページ（mountain.html）
+## 3Dページ（index.html）
 
-全国の各歳別人口を、年・年齢・人数の3軸の「山脈」として立体で見せます。<http://localhost:8000/mountain.html> で開きます（`?step=free` のように段を指定して開けます。`?fixture=1` はサンプルデータ、`?stub=1` は3D描画を使わない仮実装）。仕様は [docs/MOUNTAIN.md](docs/MOUNTAIN.md) にあります。
+全国の各歳別人口を、年・年齢・人数の3軸の「山脈」として立体で見せます。<http://localhost:8000/> で開きます（`?step=free` のように段を指定して開けます。`?fixture=1` はサンプルデータ、`?stub=1` は3D描画を使わない仮実装）。仕様は [docs/MOUNTAIN.md](docs/MOUNTAIN.md) にあります。
 
 **見方**：横が年（1920→2025）、奥行きが年齢（0→100歳）、高さが人数です。手前の面が男性、奥の面が女性で、100歳の側を境に鏡写しに置いています。山を斜めに走る細い線は「コホートの糸」で、同じ年に生まれた世代が年ごとに1歳ずつ年齢を重ねる軌跡です。強調の色は男性が青、女性が茶色で、終戦前後（1945〜46年生まれ）は破線です。1941〜43年は推計がないため面にすき間があり、1944〜46年は数え年なので淡く描きます。各年のいちばん上の段（85歳以上など）は面に含めません。
 
@@ -100,11 +113,12 @@ node tests/e2e/mountain.cjs --base http://localhost:8000 --out docs/screenshots 
 ## ファイル構成
 
 ```
-index.html            ページ本体（解説文は #about）
+index.html            3Dページ本体（公開の入口）
+national.html         全国の2Dページ（解説文は #about）
 css/style.css         スタイル
 js/                   フロントエンド（ES modules）
 js/mountain/          3Dページ（scene.js が three.js の描画）
-mountain.html         3Dページ本体
+mountain.html         古いURL用の転送ページ（/ へ移る）
 data/                 生成データ（pyramid.json, CSV, build_report.json, sources.lock.json）
 data/schema/          pyramid.json のスキーマ
 scripts/              データ構築（build_data.py と pyramid_data/）

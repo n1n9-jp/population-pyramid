@@ -1,7 +1,7 @@
 import { DATA_PATH, FIXTURE_PATH } from "../config.js";
 import { createInset } from "./inset.js";
 import { createTour, observeSteps, STEPS } from "./tour.js";
-import { createFreeUI, createLegend, createNotes, createPickTooltip, createSources, fillCalc } from "./ui.js";
+import { createFlightUI, createFreeUI, createLegend, createNotes, createPickTooltip, createSources, fillCalc } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,7 +36,10 @@ function createNullScene() {
     setForm: (f) => { s.form = f; }, setCamera: (c) => { s.camera = c; },
     setCutYear: (y) => { s.cutYear = y; }, setHighlight: (ids) => { s.highlight = [...ids]; },
     setOrbit() {}, resize() {}, onPick() {}, dispose() {},
-    getState: () => ({ ...s, highlight: [...s.highlight] }),
+    // 飛ばない（すぐ onEnd を呼ぶ）
+    fly: (id, { onEnd } = {}) => { onEnd?.({ reason: "unsupported", cohort: id }); },
+    stopFlight() {},
+    getState: () => ({ ...s, highlight: [...s.highlight], flight: null }),
   };
 }
 
@@ -97,7 +100,8 @@ async function main() {
   let tour = null;
   const legend = createLegend({ data });
   const free = createFreeUI({ data, scene, inset, getStep: () => tour?.getStep(), legend });
-  tour = createTour({ scene, free, reducedMotion, legend });
+  const flight = createFlightUI({ scene, legend, getStep: () => tour?.getStep(), getForm: () => tour?.getForm(), setForm: (f) => tour?.setForm(f) });
+  tour = createTour({ scene, free, reducedMotion, legend, flight });
   free.attach(tour);
   createPickTooltip({ data, scene, stage, canvas });
 

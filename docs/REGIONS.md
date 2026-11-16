@@ -1,6 +1,6 @@
 # 地域別スモールマルティプルズの契約（全担当が参照する）
 
-全国ページ（index.html）はそのまま残す。新ページ `regions.html` で、都道府県（47）または地方ブロック（8）ごとの小さな人口ピラミッドを並べ、1920〜2025年（5年ごと、22時点）を1本のスライダーで一斉に動かす。年齢は5歳階級。横軸は「その地域の総人口に占める割合」。
+全国ページ（現在は national.html。当初は index.html）はそのまま残す。新ページ `regions.html` で、都道府県（47）または地方ブロック（8）ごとの小さな人口ピラミッドを並べ、1920〜2025年（5年ごと、22時点）を1本のスライダーで一斉に動かす。年齢は5歳階級。横軸は「その地域の総人口に占める割合」。
 
 Git の手順は docs/PLAN.md §5 と同じ（ブランチ `claude/sharp-newton-grgdly`、所有パスだけを add、pull --rebase してから push、force push はしない）。
 
@@ -153,7 +153,7 @@ Git の手順は docs/PLAN.md §5 と同じ（ブランチ `claude/sharp-newton-
   - 再生中は `#year-display` の aria-live を off にする。
 - **ツールチップ**：タイルにホバーかタップで表示する。内容は、地域名、総人口（「1億2,297万人」「55万人」の書式は全国ページの formatTotal と同じ）、65歳以上の割合、そしてポインタのある段の年齢階級と、男女それぞれの割合（%、小数1桁）。
 - **URL**：停止中は `?year=` と `?facet=prefecture|block` を replaceState で書き換える。
-- **全国ページ**：index.html のヘッダー（`.site-header` の lede の後）に、`<p class="page-nav"><a href="regions.html">都道府県・地方別に見る →</a></p>` を1行だけ足す。ほかは変えない。
+- **全国ページ**：当初は全国ページから地域別ページへのリンクを置いたが、現在は3Dページ（index.html）だけを表に出すため、リンクを置かない。.page-nav は「← 人口の山脈（3D）へ」（href="./"）の1本だけ。
 
 ### E2E との約束（DOM の目印）
 - 切り替え：`#facet-toggle button[data-facet="prefecture"]` と `[data-facet="block"]`。選択中は `aria-pressed="true"`。
