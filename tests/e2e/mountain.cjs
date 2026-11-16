@@ -1,5 +1,5 @@
 'use strict';
-// 3Dページ「人口の山脈とコホートの糸」（/ = index.html）の E2E テスト。仕様は docs/MOUNTAIN.md §4〜§7。
+// 3Dページ「人口の山脈をたどる：世代の100年」（/ = index.html）の E2E テスト。仕様は docs/MOUNTAIN.md §4〜§7。
 // 使い方: node tests/e2e/mountain.cjs --base http://localhost:8000 [--fixture] [--stub] [--out DIR]
 // --stub は ?stub=1（scene-stub.js）で開く。3D 描画は検査せず、状態・UI・ツールチップだけを検査する。
 const path = require('path');
@@ -347,7 +347,7 @@ async function main() {
       assert(bad.slice(0, 8).length === 0, bad.slice(0, 8).join('\n'));
     });
 
-    await check('4g. ツールチップ：糸か面をクリックすると #pick-tooltip に「N年生まれ」・年と年齢・男女と人数が、全国ページの書式で出る', async () => {
+    await check('4g. ツールチップ：世代の線か面をクリックすると #pick-tooltip に「N年生まれ」・年と年齢・男女と人数が、全国ページの書式で出る', async () => {
       await fp.locator('#form-toggle button[data-form="terrain"]').click();
       await fp.locator('#cut-slider').fill('2025');
       const box = await fp.locator('canvas#mountain-canvas').boundingBox();
@@ -781,6 +781,12 @@ async function main() {
       assert(still, 'タップの後、ツールチップがすぐ消える');
     });
 
+    await check('11a2. ページの本文（body の innerText）に「糸」と「コホート」が出てこない（用語は「世代の線」に統一）', async () => {
+      const text = await dp.evaluate(() => document.body.innerText);
+      const found = ['糸', 'コホート'].filter((w) => text.includes(w));
+      assert(found.length === 0, `本文に旧用語が残っている: ${found.join('、')}`);
+    });
+
     await check('11b. 凡例：375px では折りたたまれ、段の強調する世代の名前が出る。1280px では開いている', async () => {
       const bad = [];
       const open375 = await mp.evaluate(() => document.getElementById('legend-details').open);
@@ -789,7 +795,7 @@ async function main() {
       if (rect.l < rect.cl - 1 || rect.r > rect.cr + 1 || rect.t < rect.ct - 1 || rect.b > rect.cb + 1) bad.push(`凡例が canvas からはみ出す: ${JSON.stringify(rect)}`);
       await mp.evaluate(() => document.getElementById('legend-details').setAttribute('open', ''));
       const items = await mp.$$eval('#legend-details .legend-list li', (l) => l.map((x) => x.textContent.trim()));
-      for (const w of ['男性', '女性', '強調する世代の糸', '破線', '数え年', '推計なし']) {
+      for (const w of ['男性', '女性', '強調する世代の線', '破線', '数え年', '推計なし']) {
         if (!items.some((t) => t.includes(w))) bad.push(`凡例に「${w}」がない: ${JSON.stringify(items)}`);
       }
       const want = { dankai: '団塊の世代 1947〜49年生まれ', hinoeuma: '丙午 1966年生まれ', 'dankai-jr': '団塊ジュニア 1971〜74年生まれ', war: '終戦前後 1945〜46年生まれ' };
