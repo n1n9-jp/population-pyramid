@@ -11,21 +11,23 @@
 .m-stage:has(#mountain-canvas[data-free="true"]) #mountain-canvas { touch-action: none; }
 .m-text { padding: 0 20px 48px; min-width: 0; }
 .m-text .site-header { padding: 8px 0 12px; }
+body:not([data-step="overview"]) .scroll-hint { display: none; }
 .scroll-hint { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; text-align: center; font-size: 12px; color: var(--muted); pointer-events: none; }
 
 .scene-step { min-height: 80vh; padding: 28px 0 40px; border-top: 1px solid var(--grid); }
 .scene-step h2 { font-size: 18px; margin: 0 0 8px; line-height: 1.4; }
 .scene-step p { margin: 0 0 10px; font-size: 15px; line-height: 1.8; }
 .scene-step a { color: var(--male-strong); overflow-wrap: anywhere; }
-body[data-step] .scene-step { transition: opacity .2s; opacity: .55; }
+.scene-step { color: #5b5346; transition: color .2s; }
+.scene-step h2 { color: inherit; }
 body[data-step="overview"] .scene-step[data-step="overview"],
 body[data-step="war"] .scene-step[data-step="war"],
 body[data-step="dankai"] .scene-step[data-step="dankai"],
 body[data-step="hinoeuma"] .scene-step[data-step="hinoeuma"],
 body[data-step="dankai-jr"] .scene-step[data-step="dankai-jr"],
 body[data-step="cut2025"] .scene-step[data-step="cut2025"],
-body[data-step="free"] .scene-step[data-step="free"] { opacity: 1; }
-@media (prefers-reduced-motion: reduce) { body[data-step] .scene-step { transition: none; } }
+body[data-step="free"] .scene-step[data-step="free"] { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .scene-step { transition: none; } }
 
 /* free の操作部 */
 .free-ui { display: grid; gap: 16px; margin-top: 12px; }
@@ -89,3 +91,33 @@ body[data-step="free"] .scene-step[data-step="free"] { opacity: 1; }
 .year-notes, .notes-list { margin: 4px 0 0; padding-left: 1.2em; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .year-notes:empty { display: none; }
 .notes-list { font-size: 14px; color: var(--ink); }
+
+/* 凡例（canvas の左上） */
+.m-legend {
+  position: absolute; top: 8px; left: 8px; z-index: 4; max-width: min(250px, calc(100% - 16px));
+  background: rgba(255, 253, 246, .94); border: 1px solid var(--grid); border-radius: 6px;
+  font-size: 12px; line-height: 1.5; color: var(--ink);
+}
+.legend-details > summary { cursor: pointer; padding: 6px 10px; font-weight: 700; min-height: 32px; list-style-position: inside; }
+.legend-list, .legend-cohorts-full { list-style: none; margin: 0; padding: 0 10px 6px; }
+.legend-list li { display: flex; align-items: center; gap: 8px; padding: 1px 0; }
+.legend-cohorts-full { border-top: 1px solid var(--grid); padding-top: 6px; }
+.legend-cohorts-full:empty { display: none; }
+.legend-cohort { margin: 0; padding: 0 10px 6px; font-weight: 700; }
+.legend-cohort:empty { display: none; }
+.legend-details[open] ~ .legend-cohort { display: none; }
+.sw { flex: none; width: 22px; height: 10px; display: inline-block; position: relative; }
+.sw-male { background: var(--male); }
+.sw-female { background: var(--female); }
+.sw-thread i { position: absolute; left: 0; right: 0; height: 3px; }
+.sw-thread .tm { top: 1px; background: var(--male-strong); }
+.sw-thread .tf { top: 6px; background: var(--female-strong); }
+.sw-dash { height: 0; border-top: 3px dashed var(--ink); }
+.sw-kazoe { background: repeating-linear-gradient(90deg, rgba(157, 185, 217, .4) 0 11px, rgba(255, 197, 110, .4) 11px 22px); }
+.sw-gap { border: 1px dashed var(--muted); background: #fff; }
+body[data-fallback] .m-legend, body[data-fallback] .d3-only { display: none; }
+.btn-reset {
+  min-height: 44px; padding: 0 16px; border: 1px solid var(--muted); border-radius: 6px; background: #fffdf6;
+  color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
+}
+#mountain-canvas:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }

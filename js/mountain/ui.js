@@ -1,11 +1,11 @@
 // free の UI（形・断面・世代）、ツールチップ、データ表、出典欄。
 import { ageHeading, ageLabel, formatPersons, formatTotal, wareki } from "../format.js";
-import { ALL_COHORTS } from "./tour.js";
+import { COHORT_LABELS } from "./tour.js";
 
 const $ = (id) => document.getElementById(id);
 const comma = (v) => Math.round(v).toLocaleString("en-US");
 
-export function createFreeUI({ data, scene, inset, getStep }) {
+export function createFreeUI({ data, scene, inset, getStep, legend }) {
   const slider = $("cut-slider");
   const out = $("cut-year-out");
   const note = $("cut-note");
@@ -45,12 +45,24 @@ export function createFreeUI({ data, scene, inset, getStep }) {
     if (getStep() === "free") scene.setCutYear(r);
   }
 
+  // 重い描画（小窓・表・scene）は requestAnimationFrame で間引く。向きは入力ごとに決める
+  let pending = null;
+  let raf = 0;
+  const flush = () => {
+    raf = 0;
+    if (!pending) return;
+    const { v, dir } = pending;
+    pending = null;
+    setCutFromUser(v, dir);
+  };
   slider.addEventListener("input", () => {
     const v = Number(slider.value);
     const dir = v >= lastRaw ? 1 : -1;
     lastRaw = v; // ドラッグ中は生の値を持つ（全国ページの timeline.js と同じ）
-    setCutFromUser(v, dir);
+    pending = { v, dir };
+    if (!raf) raf = requestAnimationFrame(flush);
   });
+  slider.addEventListener("change", () => { if (raf) { cancelAnimationFrame(raf); flush(); } });
   // キー操作は現在値（解決後）からの±1なので、基準も現在値に合わせる
   slider.addEventListener("keydown", () => { lastRaw = year; });
 
@@ -60,7 +72,18 @@ export function createFreeUI({ data, scene, inset, getStep }) {
   });
 
   const selected = () => [...cohortBox.querySelectorAll("input[data-cohort]")].filter((i) => i.checked).map((i) => i.dataset.cohort);
-  cohortBox.addEventListener("change", () => { if (getStep() === "free") scene.setHighlight(selected()); });
+  cohortBox.addEventListener("change", () => {
+    if (getStep() !== "free") return;
+    scene.setHighlight(selected());
+    legend?.setHighlight(selected());
+  });
+  // 視点を戻す（scene に resetView があればそれを、なければ free のプリセットに戻す）
+  $("btn-reset-view")?.addEventListener("click", () => {
+    if (getStep() !== "free") return;
+    const animate = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (typeof scene.resetView === "function") scene.resetView({ animate });
+    else scene.setCamera("free", { animate });
+  });
 
   $("data-details").addEventListener("toggle", () => renderTable(data, year));
   showYear(year);
@@ -108,10 +131,18 @@ export function createPickTooltip({ data, scene, stage, canvas }) {
   };
   canvas.addEventListener("pointermove", track);
   canvas.addEventListener("pointerdown", track);
-  canvas.addEventListener("pointerleave", () => { tip.hidden = true; });
+  // タッチではタップ後に pointerleave が来るので、マウスのときだけ消す
+  let lastType = "mouse";
+  canvas.addEventListener("pointerdown", (e) => { lastType = e.pointerType || "mouse"; });
+  canvas.addEventListener("pointermove", (e) => { lastType = e.pointerType || lastType; });
+  canvas.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") tip.hidden = true; });
 
-  scene.onPick((p) => {
-    if (!p) { tip.hidden = true; return; }
+  scene.onPick((p, info) => {
+    if (!p) {
+      // タップで何もない所を押したときは消す。タッチ中のホバー由来の null は無視する
+      if (info?.type === "tap" || lastType === "mouse") tip.hidden = true;
+      return;
+    }
     const row = data.byYear.get(p.year);
     const precision = row ? row.precision : 1;
     const sexLabel = p.sex === "male" ? "男性" : "女性";
@@ -135,6 +166,35 @@ export function createPickTooltip({ data, scene, stage, canvas }) {
     tip.style.left = `${x}px`;
     tip.style.top = `${y}px`;
   });
+}
+
+/** 凡例：強調している世代の名前と、推計なしの年を出す。狭い画面では折りたたむ */
+export function createLegend({ data }) {
+  const details = $("legend-details");
+  const cohortLine = $("legend-cohort");
+  const full = $("legend-cohorts-full");
+  const gapEl = $("legend-gap");
+  if (data.gaps?.length) {
+    gapEl.textContent = "推計なし（" + data.gaps.map((g) => (g.start === g.end ? `${g.start}年` : `${g.start}〜${String(g.end).slice(-2)}年`)).join("・") + "）";
+  }
+  const mq = window.matchMedia("(max-width: 899px)");
+  const fit = () => { details.open = !mq.matches; };
+  fit();
+  mq.addEventListener("change", fit);
+
+  function setHighlight(ids) {
+    const list = ids.filter((id) => COHORT_LABELS[id]);
+    full.replaceChildren(...list.map((id) => {
+      const li = document.createElement("li");
+      li.dataset.cohort = id;
+      li.textContent = `${COHORT_LABELS[id].name} ${COHORT_LABELS[id].range}`;
+      return li;
+    }));
+    cohortLine.textContent = list.length === 0 ? ""
+      : list.length === 1 ? `強調：${COHORT_LABELS[list[0]].name} ${COHORT_LABELS[list[0]].range}`
+      : `強調：${list.map((id) => COHORT_LABELS[id].name).join("・")}`;
+  }
+  return { setHighlight };
 }
 
 export function createSources({ data }) {

@@ -300,10 +300,12 @@ async function main() {
       const g = data.gaps[0];
       assert(g, 'data.gaps が空');
       const s0 = g.start - 1, e0 = g.end + 1;
-      const drag = (v) => fp.evaluate((val) => {
+      // input は requestAnimationFrame で間引かれるので、1フレーム進めてから読む
+      const drag = (v) => fp.evaluate(async (val) => {
         const el = document.getElementById('cut-slider');
         el.value = String(val);
         el.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         return window.__mountain.scene.getState().cutYear;
       }, v);
       const got = [];
@@ -454,6 +456,17 @@ async function main() {
       const errs = nw.mine.filter((m) => m.includes('pageerror'));
       assert(errs.length === 0, errs.join('\n'));
       assert(await nw.page.locator('.scene-step[data-step]').count() === STEPS.length, '段落が7つ残っていない');
+      const vis = await nw.page.evaluate(() => {
+        const v = (sel) => { const e = document.querySelector(sel); return !!e && e.getClientRects().length > 0; };
+        return { lede: v('.lede .d3-only'), form: v('#form-toggle'), cohort: v('#cohort-select'), reset: v('#btn-reset-view'), slider: v('#cut-slider'), inset: v('#inset'), table: v('#data-details'), legend: v('#legend') };
+      });
+      const bad = [];
+      if (vis.lede) bad.push('「スクロールすると…」が残っている');
+      if (vis.form) bad.push('形の切り替えが残っている');
+      if (vis.cohort) bad.push('強調する世代が残っている');
+      if (vis.reset) bad.push('視点を戻すが残っている');
+      if (!vis.slider || !vis.inset || !vis.table) bad.push(`断面スライダー・小窓・データ表が消えている: ${JSON.stringify(vis)}`);
+      assert(bad.length === 0, bad.join('\n'));
     });
     await nw.ctx.close();
 
@@ -496,6 +509,99 @@ async function main() {
       if (!links.some((h) => /(^|\/)regions\.html(\?|#|$)/.test(h))) bad.push(`地域別ページ(regions.html)へのリンクなし: ${JSON.stringify(links)}`);
       assert(bad.length === 0, bad.join('\n'));
     });
+
+    await check('11a. 375px でタップしたあと、ツールチップが見えたまま残る', async () => {
+      await scrollToStep(mp, 'free');
+      await waitBodyStep(mp, 'free');
+      await mp.evaluate(() => window.scrollTo(0, 0));
+      await sleep(300);
+      const box = await mp.locator('canvas#mountain-canvas').boundingBox();
+      let shown = false;
+      for (let gy = 0.3; gy <= 0.9 && !shown; gy += 0.05) {
+        for (let gx = 0.2; gx <= 0.9 && !shown; gx += 0.05) {
+          await mp.touchscreen.tap(box.x + box.width * gx, box.y + box.height * gy);
+          await sleep(80);
+          shown = await mp.evaluate(() => { const t = document.getElementById('pick-tooltip'); return !!t && !t.hidden; });
+        }
+      }
+      assert(shown, 'タップしてもツールチップが出ない');
+      await sleep(700);
+      const still = await mp.evaluate(() => { const t = document.getElementById('pick-tooltip'); return !!t && !t.hidden; });
+      assert(still, 'タップの後、ツールチップがすぐ消える');
+    });
+
+    await check('11b. 凡例：375px では折りたたまれ、段の強調する世代の名前が出る。1280px では開いている', async () => {
+      const bad = [];
+      const open375 = await mp.evaluate(() => document.getElementById('legend-details').open);
+      if (open375) bad.push('375px で凡例が開いたまま');
+      const rect = await mp.evaluate(() => { const r = document.getElementById('legend').getBoundingClientRect(); const c = document.getElementById('mountain-canvas').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, cl: c.left, cr: c.right, ct: c.top, cb: c.bottom }; });
+      if (rect.l < rect.cl - 1 || rect.r > rect.cr + 1 || rect.t < rect.ct - 1 || rect.b > rect.cb + 1) bad.push(`凡例が canvas からはみ出す: ${JSON.stringify(rect)}`);
+      await mp.evaluate(() => document.getElementById('legend-details').setAttribute('open', ''));
+      const items = await mp.$$eval('#legend-details .legend-list li', (l) => l.map((x) => x.textContent.trim()));
+      for (const w of ['男性', '女性', '強調する世代の糸', '破線', '数え年', '推計なし']) {
+        if (!items.some((t) => t.includes(w))) bad.push(`凡例に「${w}」がない: ${JSON.stringify(items)}`);
+      }
+      const want = { dankai: '団塊の世代 1947〜49年生まれ', hinoeuma: '丙午 1966年生まれ', 'dankai-jr': '団塊ジュニア 1971〜74年生まれ', war: '終戦前後 1945〜46年生まれ' };
+      for (const [step, text] of Object.entries(want)) {
+        await scrollToStep(dp, step === 'war' ? 'war' : step);
+        await waitBodyStep(dp, step === 'war' ? 'war' : step);
+        const got = await dp.evaluate(() => document.getElementById('legend').textContent.replace(/\s+/g, ' '));
+        if (!got.includes(text)) bad.push(`${step} 段の凡例に「${text}」がない: ${got}`);
+      }
+      const open1280 = await dp.evaluate(() => document.getElementById('legend-details').open);
+      if (!open1280) bad.push('1280px で凡例が閉じている');
+      assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check('11c. 読んでいない段落の文字は #5b5346（opacity で薄めない）、「↓ スクロールして読む」は overview のときだけ', async () => {
+      const bad = [];
+      await scrollToStep(dp, 'overview');
+      await waitBodyStep(dp, 'overview');
+      const v = await dp.evaluate(() => {
+        const el = document.querySelector('.scene-step[data-step="dankai"]');
+        const cs = getComputedStyle(el);
+        return { op: cs.opacity, color: cs.color, hint: getComputedStyle(document.querySelector('.scroll-hint')).display };
+      });
+      if (v.op !== '1') bad.push(`opacity=${v.op}`);
+      if (v.color !== 'rgb(91, 83, 70)') bad.push(`読んでいない段落の color=${v.color}`);
+      if (v.hint === 'none') bad.push('overview で「スクロールして読む」が出ない');
+      await scrollToStep(dp, 'war');
+      await waitBodyStep(dp, 'war');
+      const h2 = await dp.evaluate(() => getComputedStyle(document.querySelector('.scroll-hint')).display);
+      if (h2 !== 'none') bad.push('overview 以外で「スクロールして読む」が出ている');
+      assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check('11d. canvas の aria-label は段で変わり、free のときだけ tabindex=0', async () => {
+      const bad = [];
+      const labels = new Set();
+      for (const step of STEPS) {
+        await scrollToStep(dp, step);
+        await waitBodyStep(dp, step);
+        const v = await dp.evaluate(() => { const c = document.getElementById('mountain-canvas'); return { l: c.getAttribute('aria-label'), t: c.getAttribute('tabindex') }; });
+        labels.add(v.l);
+        if (!v.l) bad.push(`${step}: aria-label なし`);
+        if (step === 'free' ? v.t !== '0' : v.t !== null) bad.push(`${step}: tabindex=${v.t}`);
+      }
+      if (labels.size < STEPS.length) bad.push(`段ごとに aria-label が違わない（${labels.size}種）`);
+      assert(bad.length === 0, bad.join('\n'));
+    });
+
+    await check('11e. free：「視点を戻す」ボタンがあり、押しても落ちず free のカメラのまま', async () => {
+      await scrollToStep(dp, 'free');
+      await waitBodyStep(dp, 'free');
+      assert(await dp.locator('#btn-reset-view').count() === 1, '#btn-reset-view がない');
+      assert(await accName(dp, '#btn-reset-view'), 'ボタンに名前がない');
+      await dp.click('#btn-reset-view');
+      await sleep(200);
+      assert((await getState(dp)).camera === 'free', 'camera が free でない');
+    });
+
+    await check('11f. 375px：.page-nav のリンクが折り返しても「→」だけが落ちない（nowrap）', async () => {
+      const ws = await mp.$$eval('.page-nav a', (as) => as.map((a) => getComputedStyle(a).whiteSpace));
+      assert(ws.length >= 2 && ws.every((w) => w === 'nowrap'), `white-space=${JSON.stringify(ws)}`);
+    });
+
     await m.ctx.close();
     await d.ctx.close();
 

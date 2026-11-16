@@ -1,7 +1,7 @@
 import { DATA_PATH, FIXTURE_PATH } from "../config.js";
 import { createInset } from "./inset.js";
 import { createTour, observeSteps, STEPS } from "./tour.js";
-import { createFreeUI, createNotes, createPickTooltip, createSources, fillCalc } from "./ui.js";
+import { createFreeUI, createLegend, createNotes, createPickTooltip, createSources, fillCalc } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -95,8 +95,9 @@ async function main() {
   createNotes({ data });
   const inset = createInset({ root: $("inset"), data });
   let tour = null;
-  const free = createFreeUI({ data, scene, inset, getStep: () => tour?.getStep() });
-  tour = createTour({ scene, free, reducedMotion });
+  const legend = createLegend({ data });
+  const free = createFreeUI({ data, scene, inset, getStep: () => tour?.getStep(), legend });
+  tour = createTour({ scene, free, reducedMotion, legend });
   free.attach(tour);
   createPickTooltip({ data, scene, stage, canvas });
 
