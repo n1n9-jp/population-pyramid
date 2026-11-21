@@ -167,9 +167,10 @@ async function main() {
       await sleep(300);
       assert(d.mine.length === 0, d.mine.join('\n'));
     });
-    await check('1c. head に GTM（GTM-KGP7P7TR）の gtm.js を読む script 要素がちょうど1つある', async () => {
-      const n = await dp.$$eval('head script[src*="googletagmanager.com/gtm.js?id=GTM-KGP7P7TR"]', (s) => s.length);
-      assert(n === 1, `gtm.js の script 要素数=${n}`);
+    await check('1c. head に GTM（GTM-55W4KMR6）が本番ホストでのみ読み込まれる', async () => {
+      const n = await dp.$$eval('head script[src*="googletagmanager.com/gtm.js?id=GTM-55W4KMR6"]', (s) => s.length);
+      const expected = new URL(dp.url()).hostname === "population-pyramid.structure-and-representation.com" ? 1 : 0;
+      assert(n === expected, `gtm.js の script 要素数=${n}`);
     });
 
     const xMax = data.xMaxPerSex;

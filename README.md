@@ -15,7 +15,7 @@
 
 2Dの2ページには、3Dページへ戻るリンク（「← 人口の山脈（3D）へ」）だけを置いています。
 
-計測タグ（Google タグマネージャー、コンテナID `GTM-KGP7P7TR`）を `index.html`・`national.html`・`regions.html` の `<head>` に入れています（転送ページ `mountain.html` には入れていません）。E2E では GTM / GA への通信を止めて検査します。
+計測タグ（Google タグマネージャー、コンテナID `GTM-55W4KMR6`、本番ホスト限定）を `index.html`・`national.html`・`regions.html` の `<head>` に入れています（転送ページ `mountain.html` には入れていません）。E2E では GTM / GA への通信を止めて検査します。
 
 ## ローカルで見る
 
